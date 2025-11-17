@@ -34,6 +34,9 @@
 #include <stdint.h>
 
 #include <univalue.h>
+#include <boost/bind/bind.hpp>
+
+using namespace boost::placeholders;
 
 static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
 

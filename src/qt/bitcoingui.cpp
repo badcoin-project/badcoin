@@ -52,6 +52,9 @@
 #include <QTimer>
 #include <QToolBar>
 #include <QVBoxLayout>
+#include <boost/bind/bind.hpp>
+
+using namespace boost::placeholders;
 
 #if QT_VERSION < 0x050000
 #include <QTextDocument>

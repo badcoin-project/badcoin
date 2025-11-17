@@ -15,11 +15,13 @@
 #include <set>
 #include <stdlib.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/signals2/signal.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/replace.hpp>
+
+using namespace boost::placeholders;
 
 #include <event2/bufferevent.h>
 #include <event2/buffer.h>

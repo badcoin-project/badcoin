@@ -18,6 +18,9 @@
 #include <script/sigcache.h>
 
 #include <memory>
+#include <boost/bind/bind.hpp>
+
+using namespace boost::placeholders;
 
 void CConnmanTest::AddNode(CNode& node)
 {
