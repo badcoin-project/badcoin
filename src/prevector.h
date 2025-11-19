@@ -151,6 +151,11 @@ private:
         struct {
             size_type capacity;
             char* indirect;
+
+             // Explicitly initialize direct[] so GCC14 stops complaining
+    direct_or_indirect() {
+        std::memset(direct, 0, sizeof(direct));
+    }
         };
     } _union;
 
