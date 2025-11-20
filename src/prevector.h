@@ -32,6 +32,12 @@
  *  The data type T must be movable by memmove/realloc(). Once we switch to C++,
  *  move constructors can be used instead.
  */
+
+ #if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 template<unsigned int N, typename T, typename Size = uint32_t, typename Diff = int32_t>
 class prevector {
 public:
@@ -151,11 +157,6 @@ private:
         struct {
             size_type capacity;
             char* indirect;
-
-             // Explicitly initialize direct[] so GCC14 stops complaining
-    direct_or_indirect() {
-        std::memset(direct, 0, sizeof(direct));
-    }
         };
     } _union;
 
@@ -517,6 +518,11 @@ public:
         return item_ptr(0);
     }
 };
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
 #pragma pack(pop)
 
 #endif // BITCOIN_PREVECTOR_H
