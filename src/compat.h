@@ -10,6 +10,9 @@
 #include <config/bitcoin-config.h>
 #endif
 
+// Silence Boost global placeholder warnings
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+
 #ifdef WIN32
 #ifdef _WIN32_WINNT
 #undef _WIN32_WINNT
