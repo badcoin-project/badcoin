@@ -1,59 +1,172 @@
-# Contributing to Badcoin
+Contributing to Badcoin
 
-Thanks for taking the time to contribute. Badcoin is a community-driven modernization of an older multi-algorithm blockchain. Clear contributions help keep the project clean, stable, and maintainable.
+Badcoin is an open, community-driven modernization of an older multi-algorithm blockchain. Anyone may contribute: peer review, testing, refactoring, documentation, or code patches. What matters is clarity, quality, and respect for the long-term stability of the chain.
 
----
+This document outlines how contributions are structured, evaluated, and merged.
 
-## Branch Workflow
-Use the following branch naming patterns:
+Project Structure & Governance
 
-- `feature/<name>` for new features  
-- `bugfix/<name>` for fixes  
-- `refactor/<name>` for cleanup  
-- `docs/<name>` for documentation changes  
-- `testnet/<name>` for testnet-focused work  
-- `release/<version>` for version bumps and release prep  
+Badcoin follows an open contributor model. There are no “Core developers” with special privileges, but for practical reasons:
 
-Example:  
-`feature/wallet-integration`
+Maintainers merge pull requests and enforce project standards.
 
----
+The lead maintainer oversees releases, consensus-level decisions, and appoints maintainers.
 
-## Submitting Issues
-Use the issue templates provided. Include:
-- OS and environment  
-- Branch and commit hash  
-- Build flags used  
-- Steps to reproduce  
-- Logs or screenshots  
+Trust is earned over time through meaningful, reliable contributions.
+No single developer “owns” the project.
 
----
+Contributor Workflow
 
-## Submitting Pull Requests
-All PRs must:
-- Use the PR template  
-- Be focused and scoped  
-- Compile cleanly  
-- Pass unit tests  
-- Avoid unrelated changes  
-- Include any necessary documentation updates  
+All contributions, without exception, follow the pull-request model.
 
-Consensus changes must be thoroughly explained and justified.
+1. Fork the repository
+2. Create a topic branch
 
----
+Use descriptive patterns:
 
-## Coding Style
-Follow the existing Badcoin/Bitcoin Core formatting and structure:
-- C++11  
-- No custom style deviations  
-- Avoid unnecessary dependencies  
-- Keep diffs clean and readable  
+feature/<name> for new functionality
 
----
+bugfix/<name> for fixes
 
-## Licensing
-All contributions are under the MIT license.
+refactor/<name> for code cleanup
 
----
+docs/<name> for documentation
 
-Thanks for helping keep Badcoin alive, modern, and not a flaming pile of legacy spaghetti.
+testnet/<name> for testnet activity
+
+release/<version> for version prep
+
+Example:
+feature/wallet-integration
+
+3. Commit your changes
+
+Keep commits atomic
+
+Do not mix formatting changes with functional changes
+
+Follow the coding conventions documented in doc/developer-notes.md
+
+4. Write proper commit messages
+
+Short subject (≤ 50 chars)
+
+Blank line
+
+One or more paragraphs explaining why the change exists
+
+Reference issues using refs #1234 or fixes #4321
+
+5. Push and open a Pull Request
+
+Prefix PR titles with the affected area:
+
+Consensus: <description>
+
+Net: / P2P:
+
+RPC: / REST: / ZMQ:
+
+Mining:
+
+Wallet:
+
+Qt:
+
+Scripts: / Tools:
+
+Tests:
+
+Docs:
+
+Trivial: for PRs that do not alter executable code
+
+Example:
+Wallet: Fix null keypool import crash
+
+Use [WIP] if the PR is not ready for merging.
+
+Pull Request Requirements
+
+All pull requests must:
+
+Compile cleanly
+
+Pass unit tests and functional tests
+
+Follow project coding style
+
+Contain only focused, related changes
+
+Include documentation updates when needed
+
+Consensus-affecting changes require extensive discussion, review, and justification.
+
+PRs that refactor or move code must not change behavior without explicit purpose.
+
+Squashing & Rebasing
+
+You may be asked to squash commits before merging.
+
+git checkout your_branch
+git rebase -i HEAD~n   # n = number of commits
+git push -f
+
+
+If rebasing terrifies you, enable “Allow edits from maintainers” and someone can help.
+
+Peer Review Philosophy
+
+Peer review is essential and expected. Reviewers will test patches, examine code, and comment with:
+
+ACK – tested and approved
+
+utACK – reviewed, not tested
+
+Concept ACK – idea makes sense
+
+NACK – technical reasons the change should not be merged
+
+Nit – minor, non-blocking suggestions
+
+Review takes time. Be patient. Quality matters more than speed.
+
+Coding Style
+
+Badcoin inherits the Bitcoin Core/Myriaid conventions:
+
+C++11
+
+No unnecessary dependencies
+
+Minimal stylistic divergence
+
+Clean diffs
+
+Avoid format-only PRs combined with logic changes
+
+Trivial changes that create noise without benefit may be closed.
+
+Release Policy
+
+The project lead is responsible for:
+
+Release planning
+
+Tagging
+
+Final merge approval for release branches
+
+Licensing
+
+By contributing to this repository, you agree that:
+
+Your work is licensed under the MIT License, unless explicitly stated otherwise
+
+If you contribute code you did not author, you must preserve its original copyright/license header
+
+See COPYING for the full license text
+
+Thank You
+
+Every sensible contribution helps modernize a strange, aging, five-algorithm blockchain held together by hope, caffeine, and sheer stubbornness. Your clean patches keep Badcoin from collapsing into a flaming ball of legacy spaghetti.
