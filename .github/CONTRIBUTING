@@ -1,0 +1,59 @@
+# Contributing to Badcoin
+
+Thanks for taking the time to contribute. Badcoin is a community-driven modernization of an older multi-algorithm blockchain. Clear contributions help keep the project clean, stable, and maintainable.
+
+---
+
+## Branch Workflow
+Use the following branch naming patterns:
+
+- `feature/<name>` for new features  
+- `bugfix/<name>` for fixes  
+- `refactor/<name>` for cleanup  
+- `docs/<name>` for documentation changes  
+- `testnet/<name>` for testnet-focused work  
+- `release/<version>` for version bumps and release prep  
+
+Example:  
+`feature/wallet-integration`
+
+---
+
+## Submitting Issues
+Use the issue templates provided. Include:
+- OS and environment  
+- Branch and commit hash  
+- Build flags used  
+- Steps to reproduce  
+- Logs or screenshots  
+
+---
+
+## Submitting Pull Requests
+All PRs must:
+- Use the PR template  
+- Be focused and scoped  
+- Compile cleanly  
+- Pass unit tests  
+- Avoid unrelated changes  
+- Include any necessary documentation updates  
+
+Consensus changes must be thoroughly explained and justified.
+
+---
+
+## Coding Style
+Follow the existing Badcoin/Bitcoin Core formatting and structure:
+- C++11  
+- No custom style deviations  
+- Avoid unnecessary dependencies  
+- Keep diffs clean and readable  
+
+---
+
+## Licensing
+All contributions are under the MIT license.
+
+---
+
+Thanks for helping keep Badcoin alive, modern, and not a flaming pile of legacy spaghetti.
