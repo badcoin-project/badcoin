@@ -188,7 +188,7 @@ public:
 class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
-        strNetworkID = "badtest";
+        strNetworkID = "test";
 
         /*** Badcoin Additional Chainparams ***/
         consensus.nAveragingInterval = 10; // number of blocks to take the timespan of
@@ -233,11 +233,11 @@ public:
         // By default assume that the signatures in ancestors of this block are valid.
         consensus.defaultAssumeValid = uint256S("0x00000dd96875372672b943e30bd12281c75d0fed7462d486e305b09613a6d6fa"); // 1
 
-        pchMessageStart[0] = 0xfa;
-        pchMessageStart[1] = 0xd0;
-        pchMessageStart[2] = 0xba;
-        pchMessageStart[3] = 0xdc;
-        nDefaultPort = 21900;
+        pchMessageStart[0] = 0xab;
+        pchMessageStart[1] = 0xff;
+        pchMessageStart[2] = 0xcc;
+        pchMessageStart[3] = 0x33;
+        nDefaultPort = 19012;
         nPruneAfterHeight = 1000;
 
         genesis = CreateGenesisBlock(1543455632, 32852, 0x1e0fffff, "On 11/28/2018 the Badcoin Testnet Genesis was created");
@@ -256,7 +256,7 @@ public:
 
         bech32_hrp = "badt";
 
-            //vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
+        vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = false;

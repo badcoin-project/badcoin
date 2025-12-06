@@ -4,7 +4,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <protocol.h>
-#include <string>
 
 #include <util.h>
 #include <utilstrencodings.h>
@@ -12,14 +11,6 @@
 #ifndef WIN32
 # include <arpa/inet.h>
 #endif
-
-const unsigned char CMessageHeader::pchMessageStart_test[CMessageHeader::MESSAGE_START_SIZE] = { 0xfa, 0xd0, 0xba, 0xdc };
-
-const unsigned char* CMessageHeader::GetMessageStartForNetwork(const std::string& network) {
-    if (network == "badtest")
-        return CMessageHeader::pchMessageStart_test;
-    return nullptr;
-}
 
 namespace NetMsgType {
 const char *VERSION="version";
