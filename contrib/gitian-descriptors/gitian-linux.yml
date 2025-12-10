@@ -28,7 +28,7 @@ packages:
 - "ca-certificates"
 - "python"
 remotes:
-- "url": "https://github.com/ScriptProdigy/badcoin.git"
+- "url": "https://github.com/badcoin-project/badcoin.git"
   "dir": "badcoin"
 files: []
 script: |
