@@ -7,32 +7,11 @@
  * Each line contains a 16-byte IPv6 address and a port.
  * IPv4 as well as onion addresses are wrapped inside a IPv6 address accordingly.
  */
-
 static SeedSpec6 pnSeed6_main[] = {
-    // Placeholder – add real seeds when mainnet relaunch is ready
-    // Example format:
-    // {
-    //     {
-    //         0x00,0x00,0x00,0x00,
-    //         0x00,0x00,0x00,0x00,
-    //         0x00,0x00,0xFF,0xFF,
-    //         0xC2,0xEE,0x1E,0x1E
-    //     },
-    //     9012
-    // }
+    
 };
 
 static SeedSpec6 pnSeed6_test[] = {
-    // IPv4 fallback seed: 194.238.30.30
-    // IPv4 must be stored as ::ffff:a.b.c.d (last 4 bytes)
-    {
-        {
-            0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,
-            0x00,0x00,0xFF,0xFF,
-            0xC2,0xEE,0x1E,0x1E
-        },
-        21900
-    },
+
 };
 #endif // BITCOIN_CHAINPARAMSSEEDS_H
