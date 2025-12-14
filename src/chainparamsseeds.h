@@ -25,17 +25,6 @@ static SeedSpec6 pnSeed6_main[] = {
 static SeedSpec6 pnSeed6_test[] = {
     // IPv4 fallback seed: 194.238.30.30
     // IPv4 must be stored as ::ffff:a.b.c.d (last 4 bytes)
-    {    
-        {
-            0x00,0x00,0x00,0x00,
-            0x00,0x00,0x00,0x00,
-            0x00,0x00,0xFF,0xFF,
-            0xC2,0xEE,0x1E,0x1E
-        },
-        21900
-    },
-
-    // Optional second entry: same IP twice improves client bootstrap reliability
     {
         {
             0x00,0x00,0x00,0x00,
@@ -45,6 +34,5 @@ static SeedSpec6 pnSeed6_test[] = {
         },
         21900
     },
-
 };
 #endif // BITCOIN_CHAINPARAMSSEEDS_H
