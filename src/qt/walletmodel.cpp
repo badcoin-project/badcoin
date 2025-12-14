@@ -35,6 +35,9 @@
 #include <QMessageBox>
 #include <QSet>
 #include <QTimer>
+#include <boost/bind/bind.hpp>
+
+using namespace boost::placeholders;
 
 
 WalletModel::WalletModel(const PlatformStyle *platformStyle, CWallet *_wallet, OptionsModel *_optionsModel, QObject *parent) :

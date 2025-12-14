@@ -51,6 +51,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <memory>
+#include <boost/bind/bind.hpp>
+
+using namespace boost::placeholders;
 
 #ifndef WIN32
 #include <signal.h>
@@ -59,7 +62,6 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/split.hpp>
-#include <boost/bind.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 #include <boost/thread.hpp>
 #include <openssl/crypto.h>
@@ -527,8 +529,8 @@ std::string HelpMessage(HelpMessageMode mode)
 
 std::string LicenseInfo()
 {
-    const std::string URL_SOURCE_CODE = "<https://github.com/ScriptProdigy/Badcoin>";
-    const std::string URL_WEBSITE = "<http://www.badcryptopodcast.com>";
+    const std::string URL_SOURCE_CODE = "<https://github.com/badcoin-project/badcoin>";
+    const std::string URL_WEBSITE = "<https://badcoin.dev>";
 
     return CopyrightHolders(strprintf(_("Copyright (C) %i-%i"), 2009, COPYRIGHT_YEAR) + " ") + "\n" +
            "\n" +
