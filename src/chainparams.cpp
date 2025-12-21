@@ -255,8 +255,13 @@ public:
         base58Prefixes[EXT_SECRET_KEY] = {0xA6, 0xC4, 0xAC, 0xC9};
 
         bech32_hrp = "badt";
+        
+        // DNS seed for testnet bootstrap
+        vSeeds.clear();
+        vSeeds.emplace_back("tn-seed.badcoin.dev");
 
-            //vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
+        // Fixed seeds intentionally disabled for now
+        //vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = false;
