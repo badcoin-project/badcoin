@@ -153,12 +153,7 @@ public:
 
         bech32_hrp = "bad";
 
-        vSeeds.push_back("165.227.13.253:9011");
-        vSeeds.push_back("165.227.13.253:9012");
-        vSeeds.push_back("165.227.13.253:9013");
-        vSeeds.push_back("165.227.13.253:9014");
-        vSeeds.push_back("165.227.13.253:9015");
-        vSeeds.push_back("157.230.56.219");
+
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
 
@@ -191,7 +186,7 @@ public:
         strNetworkID = "badtest";
 
         /*** Badcoin Additional Chainparams ***/
-        consensus.nAveragingInterval = 10; // number of blocks to take the timespan of
+        consensus.nAveragingInterval = 3; // number of blocks to take the timespan of
 
         consensus.nStartAuxPow = 1;
         consensus.nAuxpowChainId = 0x006A; 
@@ -207,9 +202,9 @@ public:
         consensus.BIP65Height = 100; // 0x0000d23adc28e33bc05f4bee57c873ae0aab584a6a436e75ac0ed40396f6d86b
         consensus.BIP66Height = 100; // 0x0000d23adc28e33bc05f4bee57c873ae0aab584a6a436e75ac0ed40396f6d86b
         consensus.powLimit = ArithToUint256(~arith_uint256(0) >> 16);
-        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60;
+        consensus.nPowTargetTimespan = 10 * 60;
         consensus.nPowTargetSpacing = 60;
-        consensus.fPowAllowMinDifficultyBlocks = false;
+        consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
         consensus.nRuleChangeActivationThreshold = 252; // 75% of 336
         consensus.nMinerConfirmationWindow = 336; // nPowTargetTimespan / nPowTargetSpacing
