@@ -529,7 +529,7 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
         int nMinVersion = 0;
         if (batch.Read((std::string)"minversion", nMinVersion))
         {
-            if (nMinVersion > CLIENT_VERSION)
+            if (nMinVersion > FEATURE_LATEST)
                 return DB_TOO_NEW;
             pwallet->LoadMinVersion(nMinVersion);
         }
