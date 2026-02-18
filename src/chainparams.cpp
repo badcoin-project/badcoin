@@ -153,12 +153,7 @@ public:
 
         bech32_hrp = "bad";
 
-        vSeeds.push_back("165.227.13.253:9011");
-        vSeeds.push_back("165.227.13.253:9012");
-        vSeeds.push_back("165.227.13.253:9013");
-        vSeeds.push_back("165.227.13.253:9014");
-        vSeeds.push_back("165.227.13.253:9015");
-        vSeeds.push_back("157.230.56.219");
+
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
 
@@ -188,10 +183,10 @@ public:
 class CTestNetParams : public CChainParams {
 public:
     CTestNetParams() {
-        strNetworkID = "test";
+        strNetworkID = "badtest";
 
         /*** Badcoin Additional Chainparams ***/
-        consensus.nAveragingInterval = 10; // number of blocks to take the timespan of
+        consensus.nAveragingInterval = 3; // number of blocks to take the timespan of
 
         consensus.nStartAuxPow = 1;
         consensus.nAuxpowChainId = 0x006A; 
@@ -207,9 +202,9 @@ public:
         consensus.BIP65Height = 100; // 0x0000d23adc28e33bc05f4bee57c873ae0aab584a6a436e75ac0ed40396f6d86b
         consensus.BIP66Height = 100; // 0x0000d23adc28e33bc05f4bee57c873ae0aab584a6a436e75ac0ed40396f6d86b
         consensus.powLimit = ArithToUint256(~arith_uint256(0) >> 16);
-        consensus.nPowTargetTimespan = 14 * 24 * 60 * 60;
+        consensus.nPowTargetTimespan = 10 * 60;
         consensus.nPowTargetSpacing = 60;
-        consensus.fPowAllowMinDifficultyBlocks = false;
+        consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
         consensus.nRuleChangeActivationThreshold = 252; // 75% of 336
         consensus.nMinerConfirmationWindow = 336; // nPowTargetTimespan / nPowTargetSpacing
@@ -233,11 +228,11 @@ public:
         // By default assume that the signatures in ancestors of this block are valid.
         consensus.defaultAssumeValid = uint256S("0x00000dd96875372672b943e30bd12281c75d0fed7462d486e305b09613a6d6fa"); // 1
 
-        pchMessageStart[0] = 0xab;
-        pchMessageStart[1] = 0xff;
-        pchMessageStart[2] = 0xcc;
-        pchMessageStart[3] = 0x33;
-        nDefaultPort = 19012;
+        pchMessageStart[0] = 0xfa;
+        pchMessageStart[1] = 0xd0;
+        pchMessageStart[2] = 0xba;
+        pchMessageStart[3] = 0xdc;
+        nDefaultPort = 21900;
         nPruneAfterHeight = 1000;
 
         genesis = CreateGenesisBlock(1543455632, 32852, 0x1e0fffff, "On 11/28/2018 the Badcoin Testnet Genesis was created");
@@ -255,8 +250,13 @@ public:
         base58Prefixes[EXT_SECRET_KEY] = {0xA6, 0xC4, 0xAC, 0xC9};
 
         bech32_hrp = "badt";
+        
+        // DNS seed for testnet bootstrap
+        vSeeds.clear();
+        vSeeds.emplace_back("tn-seed.badcoin.dev");
 
-        vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
+        // Fixed seeds intentionally disabled for now
+        //vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = false;
