@@ -1327,7 +1327,7 @@ bool AppInitMain()
         uacomments.push_back(cmt);
     }
     
-    if (Params().NetworkIDString() == "test") {
+    if (Params().NetworkIDString() == "badtest") {
     uacomments.push_back("testnet");
 }
 
