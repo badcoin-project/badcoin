@@ -150,12 +150,18 @@ public:
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,80);
         base58Prefixes[EXT_PUBLIC_KEY] = {0x06, 0xC4, 0xAB, 0xC8};
         base58Prefixes[EXT_SECRET_KEY] = {0x06, 0xC4, 0xAB, 0xC9};
-
+        
         bech32_hrp = "bad";
 
+        // DNS seed bootstrap
+        vSeeds.clear();
+        vSeeds.emplace_back("seed.badcoin.dev");
 
-
-        vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
+        // Fixed fallback seeds
+        vFixedSeeds = std::vector<SeedSpec6>(
+            pnSeed6_main,
+            pnSeed6_main + ARRAYLEN(pnSeed6_main)
+        );
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = true;
