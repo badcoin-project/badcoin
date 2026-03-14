@@ -7,7 +7,7 @@
 
 #include <net_processing.h> // For CNodeStateStats
 #include <net.h>
-
+#include <QTimer>
 #include <memory>
 
 #include <QAbstractTableModel>

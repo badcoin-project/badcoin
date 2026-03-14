@@ -9,7 +9,7 @@
 #include <qt/guiconstants.h>
 #include <qt/guiutil.h>
 #include <qt/optionsmodel.h>
-
+#include <QPainter>
 #include <QClipboard>
 #include <QDrag>
 #include <QMenu>

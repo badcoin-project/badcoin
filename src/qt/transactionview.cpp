@@ -18,7 +18,7 @@
 #include <qt/walletmodel.h>
 
 #include <ui_interface.h>
-
+#include <QKeyEvent>
 #include <QComboBox>
 #include <QDateTimeEdit>
 #include <QDesktopServices>

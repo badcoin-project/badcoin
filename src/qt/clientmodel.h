@@ -7,7 +7,7 @@
 
 #include <QObject>
 #include <QDateTime>
-
+#include <QTimer>
 #include <atomic>
 
 class BanTableModel;

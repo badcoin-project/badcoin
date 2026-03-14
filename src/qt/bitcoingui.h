@@ -11,6 +11,8 @@
 
 #include <amount.h>
 
+#include <QMouseEvent>
+
 #include <QLabel>
 #include <QMainWindow>
 #include <QMap>

@@ -14,7 +14,7 @@
 #include <qt/transactionfilterproxy.h>
 #include <qt/transactiontablemodel.h>
 #include <qt/walletmodel.h>
-
+#include <QStyleOption>
 #include <QAbstractItemDelegate>
 #include <QPainter>
 

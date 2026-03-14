@@ -11,6 +11,7 @@
 #include <QImage>
 #include <QLabel>
 #include <QPainter>
+#include <QMouseEvent>
 
 class OptionsModel;
 
