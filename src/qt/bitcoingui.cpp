@@ -34,6 +34,7 @@
 
 #include <iostream>
 
+#include <QMouseEvent>
 #include <QAction>
 #include <QApplication>
 #include <QDateTime>

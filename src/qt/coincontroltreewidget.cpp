@@ -4,6 +4,7 @@
 
 #include <qt/coincontroltreewidget.h>
 #include <qt/coincontroldialog.h>
+#include <QKeyEvent>
 
 CoinControlTreeWidget::CoinControlTreeWidget(QWidget *parent) :
     QTreeWidget(parent)

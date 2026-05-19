@@ -16,6 +16,7 @@
 #include <QString>
 #include <QTableView>
 #include <QLabel>
+#include <QMouseEvent>
 
 class QValidatedLineEdit;
 class SendCoinsRecipient;

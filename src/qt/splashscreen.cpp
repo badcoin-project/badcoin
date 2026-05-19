@@ -23,6 +23,7 @@
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDesktopWidget>
+#include <QKeyEvent>
 #include <QPainter>
 #include <QRadialGradient>
 #include <boost/bind/bind.hpp>

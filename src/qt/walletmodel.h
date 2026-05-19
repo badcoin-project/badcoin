@@ -9,7 +9,7 @@
 #include <qt/walletmodeltransaction.h>
 
 #include <support/allocators/secure.h>
-
+#include <QTimer>
 #include <map>
 #include <vector>
 

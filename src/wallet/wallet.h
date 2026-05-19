@@ -98,7 +98,7 @@ enum WalletFeature
 
     FEATURE_NO_DEFAULT_KEY = 159900, // Wallet without a default key written
 
-    FEATURE_LATEST = FEATURE_NO_DEFAULT_KEY // HD is optional, use FEATURE_COMPRPUBKEY as latest version
+    FEATURE_LATEST = FEATURE_NO_DEFAULT_KEY // Latest wallet format writes no default key; HD remains optional
 };
 
 enum OutputType : int

@@ -16,6 +16,7 @@
 #include <qt/recentrequeststablemodel.h>
 #include <qt/walletmodel.h>
 
+#include <QKeyEvent>
 #include <QAction>
 #include <QCursor>
 #include <QMessageBox>

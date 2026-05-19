@@ -9,6 +9,7 @@
 #include <qt/peertablemodel.h>
 
 #include <net.h>
+#include <QKeyEvent>
 
 #include <QWidget>
 #include <QCompleter>
