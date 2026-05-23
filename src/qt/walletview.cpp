@@ -19,6 +19,7 @@
 #include <qt/signverifymessagedialog.h>
 #include <qt/transactiontablemodel.h>
 #include <qt/transactionview.h>
+#include <qt/vanityaddresspage.h>
 #include <qt/walletmodel.h>
 
 #include <ui_interface.h>
@@ -59,6 +60,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     sendCoinsPage = new SendCoinsDialog(platformStyle);
     miningPage = new MiningPage(platformStyle);
     myAddressesPage = new MyAddressesPage(platformStyle);
+    vanityAddressPage = new VanityAddressPage(platformStyle);
 
     usedSendingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::SendingTab, this);
     usedReceivingAddressesPage = new AddressBookPage(platformStyle, AddressBookPage::ForEditing, AddressBookPage::ReceivingTab, this);
@@ -69,6 +71,7 @@ WalletView::WalletView(const PlatformStyle *_platformStyle, QWidget *parent):
     addWidget(sendCoinsPage);
     addWidget(miningPage);
     addWidget(myAddressesPage);
+    addWidget(vanityAddressPage);
 
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
     connect(overviewPage, SIGNAL(transactionClicked(QModelIndex)), transactionView, SLOT(focusTransaction(QModelIndex)));
@@ -130,6 +133,7 @@ void WalletView::setWalletModel(WalletModel *_walletModel)
     sendCoinsPage->setModel(_walletModel);
     miningPage->setWalletModel(_walletModel);
     myAddressesPage->setWalletModel(_walletModel);
+    vanityAddressPage->setWalletModel(_walletModel);
     usedReceivingAddressesPage->setModel(_walletModel ? _walletModel->getAddressTableModel() : nullptr);
     usedSendingAddressesPage->setModel(_walletModel ? _walletModel->getAddressTableModel() : nullptr);
 
@@ -195,6 +199,11 @@ void WalletView::gotoMiningPage()
 void WalletView::gotoMyAddressesPage()
 {
     setCurrentWidget(myAddressesPage);
+}
+
+void WalletView::gotoVanityAddressPage()
+{
+    setCurrentWidget(vanityAddressPage);
 }
 
 void WalletView::gotoReceiveCoinsPage()

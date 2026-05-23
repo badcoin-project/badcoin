@@ -646,6 +646,47 @@ bool WalletModel::removeReceivingAddress(const QString &address)
     return wallet->DelAddressBook(dest);
 }
 
+bool WalletModel::importVanityAddress(const QString &wif, const QString &label, QString &errorOut)
+{
+    // Decode the wallet-import-format string the Vanity Address page produced.
+    CBitcoinSecret secret;
+    if (!secret.SetString(wif.toStdString())) {
+        errorOut = tr("The private key could not be decoded.");
+        return false;
+    }
+    CKey key = secret.GetKey();
+    if (!key.IsValid()) {
+        errorOut = tr("The private key is outside the allowed range.");
+        return false;
+    }
+    CPubKey pubkey = key.GetPubKey();
+    if (!key.VerifyPubKey(pubkey)) {
+        errorOut = tr("The private key and its public key do not match.");
+        return false;
+    }
+    const CKeyID keyID = pubkey.GetID();
+
+    LOCK2(cs_main, wallet->cs_wallet);
+    wallet->MarkDirty();
+    // Label the address whether or not the key is new, so a re-save still
+    // updates the name shown on the My Addresses tab.
+    wallet->SetAddressBook(keyID, label.toStdString(), "receive");
+
+    if (wallet->HaveKey(keyID))
+        return true;   // already in the wallet; nothing more to do
+
+    // A vanity key is generated on the spot, so it has no history before now.
+    // Stamping it with the current time means no chain rescan is triggered.
+    wallet->mapKeyMetadata[keyID].nCreateTime = GetTime();
+
+    if (!wallet->AddKeyPubKey(key, pubkey)) {
+        errorOut = tr("The key could not be added to the wallet.");
+        return false;
+    }
+    wallet->LearnAllRelatedScripts(pubkey);
+    return true;
+}
+
 WalletModel::ImmatureMaturity WalletModel::getImmatureMaturity() const
 {
     // Walk the wallet's coinbase transactions that have not yet matured and

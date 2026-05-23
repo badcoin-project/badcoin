@@ -19,6 +19,7 @@ class ReceiveCoinsDialog;
 class SendCoinsDialog;
 class SendCoinsRecipient;
 class TransactionView;
+class VanityAddressPage;
 class WalletModel;
 class AddressBookPage;
 
@@ -66,6 +67,7 @@ private:
     SendCoinsDialog *sendCoinsPage;
     MiningPage *miningPage;
     MyAddressesPage *myAddressesPage;
+    VanityAddressPage *vanityAddressPage;
     AddressBookPage *usedSendingAddressesPage;
     AddressBookPage *usedReceivingAddressesPage;
 
@@ -87,6 +89,8 @@ public Q_SLOTS:
     void gotoMiningPage();
     /** Switch to My Addresses page */
     void gotoMyAddressesPage();
+    /** Switch to Vanity Address page */
+    void gotoVanityAddressPage();
 
     /** Show Sign/Verify Message dialog and switch to sign message tab */
     void gotoSignMessageTab(QString addr = "");

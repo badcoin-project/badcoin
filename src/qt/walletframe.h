@@ -70,6 +70,8 @@ public Q_SLOTS:
     void gotoMiningPage();
     /** Switch to My Addresses page */
     void gotoMyAddressesPage();
+    /** Switch to Vanity Address page */
+    void gotoVanityAddressPage();
     /** Switch to receive coins page */
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */

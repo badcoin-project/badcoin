@@ -206,6 +206,13 @@ public:
     // the page only offers this for zero-balance addresses).
     bool removeReceivingAddress(const QString &address);
 
+    // Import a freshly generated vanity keypair (private key in wallet-import
+    // format) into the wallet and label it. Used by the Vanity Address page.
+    // No chain rescan is performed: the key was just created and so has no
+    // transaction history. Returns false with a human-readable reason in
+    // errorOut on failure.
+    bool importVanityAddress(const QString &wif, const QString &label, QString &errorOut);
+
     // Coinbase maturity summary for the Overview "Coin Maturity" panel.
     struct ImmatureMaturity {
         int     count = 0;          // immature coinbase transactions

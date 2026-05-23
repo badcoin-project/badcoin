@@ -96,6 +96,7 @@ private:
     QAction *historyAction;
     QAction *miningAction;
     QAction *myAddressesAction;
+    QAction *vanityAddressAction;
     QAction *quitAction;
     QAction *sendCoinsAction;
     QAction *sendCoinsMenuAction;
@@ -205,6 +206,8 @@ private Q_SLOTS:
     void gotoSendCoinsPage(QString addr = "");
     /** Switch to mining page */
     void gotoMiningPage();
+    /** Switch to Vanity Address page */
+    void gotoVanityAddressPage();
     /** Switch to My Addresses page */
     void gotoMyAddressesPage();
 

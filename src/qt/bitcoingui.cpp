@@ -96,6 +96,7 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
     historyAction(0),
     miningAction(0),
     myAddressesAction(0),
+    vanityAddressAction(0),
     quitAction(0),
     sendCoinsAction(0),
     sendCoinsMenuAction(0),
@@ -333,6 +334,13 @@ void BitcoinGUI::createActions()
     myAddressesAction->setCheckable(true);
     tabGroup->addAction(myAddressesAction);
 
+    vanityAddressAction = new QAction(platformStyle->SingleColorIcon(":/icons/key"), tr("&Vanity Address"), this);
+    vanityAddressAction->setStatusTip(tr("Search for a custom Badcoin address that starts with letters you choose"));
+    vanityAddressAction->setToolTip(vanityAddressAction->statusTip());
+    vanityAddressAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_7));
+    vanityAddressAction->setCheckable(true);
+    tabGroup->addAction(vanityAddressAction);
+
 #ifdef ENABLE_WALLET
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins
     // can be triggered from the tray menu, and need to show the GUI to be useful.
@@ -352,6 +360,8 @@ void BitcoinGUI::createActions()
     connect(miningAction,  SIGNAL(triggered()), this, SLOT(gotoMiningPage()));
     connect(myAddressesAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(myAddressesAction, SIGNAL(triggered()), this, SLOT(gotoMyAddressesPage()));
+    connect(vanityAddressAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(vanityAddressAction, SIGNAL(triggered()), this, SLOT(gotoVanityAddressPage()));
 #endif // ENABLE_WALLET
 
     quitAction = new QAction(platformStyle->TextColorIcon(":/icons/quit"), tr("E&xit"), this);
@@ -487,6 +497,7 @@ void BitcoinGUI::createToolBars()
         toolbar->addAction(receiveCoinsAction);
         toolbar->addAction(historyAction);
         toolbar->addAction(myAddressesAction);
+        toolbar->addAction(vanityAddressAction);
         toolbar->addAction(miningAction);
         overviewAction->setChecked(true);
     }
@@ -589,6 +600,7 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     historyAction->setEnabled(enabled);
     miningAction->setEnabled(enabled);
     myAddressesAction->setEnabled(enabled);
+    vanityAddressAction->setEnabled(enabled);
     encryptWalletAction->setEnabled(enabled);
     backupWalletAction->setEnabled(enabled);
     changePassphraseAction->setEnabled(enabled);
@@ -729,6 +741,12 @@ void BitcoinGUI::gotoMyAddressesPage()
 {
     myAddressesAction->setChecked(true);
     if (walletFrame) walletFrame->gotoMyAddressesPage();
+}
+
+void BitcoinGUI::gotoVanityAddressPage()
+{
+    vanityAddressAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoVanityAddressPage();
 }
 
 void BitcoinGUI::gotoReceiveCoinsPage()

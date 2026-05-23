@@ -167,6 +167,7 @@ QT_MOC_CPP = \
   qt/moc_optionsmodel.cpp \
   qt/moc_miningpage.cpp \
   qt/moc_myaddressespage.cpp \
+  qt/moc_vanityaddresspage.cpp \
   qt/moc_overviewpage.cpp \
   qt/moc_peertablemodel.cpp \
   qt/moc_paymentserver.cpp \
@@ -240,6 +241,7 @@ BITCOIN_QT_H = \
   qt/optionsmodel.h \
   qt/miningpage.h \
   qt/myaddressespage.h \
+  qt/vanityaddresspage.h \
   qt/overviewpage.h \
   qt/paymentrequestplus.h \
   qt/paymentserver.h \
@@ -362,6 +364,7 @@ BITCOIN_QT_WALLET_CPP = \
   qt/openuridialog.cpp \
   qt/miningpage.cpp \
   qt/myaddressespage.cpp \
+  qt/vanityaddresspage.cpp \
   qt/overviewpage.cpp \
   qt/paymentrequestplus.cpp \
   qt/paymentserver.cpp \
