@@ -95,6 +95,7 @@ private:
     QAction *overviewAction;
     QAction *historyAction;
     QAction *miningAction;
+    QAction *myAddressesAction;
     QAction *quitAction;
     QAction *sendCoinsAction;
     QAction *sendCoinsMenuAction;

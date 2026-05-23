@@ -95,6 +95,7 @@ BitcoinGUI::BitcoinGUI(const PlatformStyle *_platformStyle, const NetworkStyle *
     overviewAction(0),
     historyAction(0),
     miningAction(0),
+    myAddressesAction(0),
     quitAction(0),
     sendCoinsAction(0),
     sendCoinsMenuAction(0),
@@ -325,6 +326,12 @@ void BitcoinGUI::createActions()
     miningAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_5));
     tabGroup->addAction(miningAction);
 
+    myAddressesAction = new QAction(platformStyle->SingleColorIcon(":/icons/address-book"), tr("&My Addresses"), this);
+    myAddressesAction->setStatusTip(tr("View and manage the wallet's receiving addresses"));
+    myAddressesAction->setToolTip(myAddressesAction->statusTip());
+    myAddressesAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
+    tabGroup->addAction(myAddressesAction);
+
 #ifdef ENABLE_WALLET
     // These showNormalIfMinimized are needed because Send Coins and Receive Coins
     // can be triggered from the tray menu, and need to show the GUI to be useful.
@@ -342,6 +349,7 @@ void BitcoinGUI::createActions()
     connect(historyAction, SIGNAL(triggered()), this, SLOT(gotoHistoryPage()));
     connect(miningAction,  SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(miningAction,  SIGNAL(triggered()), this, SLOT(gotoMiningPage()));
+    connect(myAddressesAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
 #endif // ENABLE_WALLET
 
     quitAction = new QAction(platformStyle->TextColorIcon(":/icons/quit"), tr("E&xit"), this);
@@ -411,6 +419,7 @@ void BitcoinGUI::createActions()
         connect(verifyMessageAction, SIGNAL(triggered()), this, SLOT(gotoVerifyMessageTab()));
         connect(usedSendingAddressesAction, SIGNAL(triggered()), walletFrame, SLOT(usedSendingAddresses()));
         connect(usedReceivingAddressesAction, SIGNAL(triggered()), walletFrame, SLOT(usedReceivingAddresses()));
+        connect(myAddressesAction, SIGNAL(triggered()), walletFrame, SLOT(usedReceivingAddresses()));
         connect(openAction, SIGNAL(triggered()), this, SLOT(openClicked()));
     }
 #endif // ENABLE_WALLET
@@ -476,6 +485,7 @@ void BitcoinGUI::createToolBars()
         toolbar->addAction(sendCoinsAction);
         toolbar->addAction(receiveCoinsAction);
         toolbar->addAction(historyAction);
+        toolbar->addAction(myAddressesAction);
         toolbar->addAction(miningAction);
         overviewAction->setChecked(true);
     }
@@ -577,6 +587,7 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     receiveCoinsMenuAction->setEnabled(enabled);
     historyAction->setEnabled(enabled);
     miningAction->setEnabled(enabled);
+    myAddressesAction->setEnabled(enabled);
     encryptWalletAction->setEnabled(enabled);
     backupWalletAction->setEnabled(enabled);
     changePassphraseAction->setEnabled(enabled);
