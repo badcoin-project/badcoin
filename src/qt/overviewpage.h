@@ -21,7 +21,9 @@ namespace Ui {
 }
 
 QT_BEGIN_NAMESPACE
+class QLabel;
 class QModelIndex;
+class QTimer;
 QT_END_NAMESPACE
 
 /** Overview ("home") page widget */
@@ -59,8 +61,19 @@ private:
     TxViewDelegate *txdelegate;
     std::unique_ptr<TransactionFilterProxy> filter;
 
+    // Network Status panel (Overview dashboard, slice 1)
+    QLabel *netSyncValue;
+    QLabel *netHeightValue;
+    QLabel *netConnValue;
+    QLabel *netNetworkValue;
+    QLabel *netLastBlockValue;
+    QLabel *netMempoolValue;
+    QTimer *netStatusTimer;
+    void buildNetworkStatusPanel();
+
 private Q_SLOTS:
     void updateDisplayUnit();
+    void updateNetworkStatus();
     void handleTransactionClicked(const QModelIndex &index);
     void updateAlerts(const QString &warnings);
     void updateWatchOnlyLabels(bool showWatchOnly);

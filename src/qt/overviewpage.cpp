@@ -14,9 +14,17 @@
 #include <qt/transactionfilterproxy.h>
 #include <qt/transactiontablemodel.h>
 #include <qt/walletmodel.h>
+#include <chainparams.h>
+
 #include <QStyleOption>
 #include <QAbstractItemDelegate>
+#include <QDateTime>
+#include <QFont>
+#include <QGridLayout>
+#include <QGroupBox>
+#include <QLabel>
 #include <QPainter>
+#include <QTimer>
 
 #define DECORATION_SIZE 54
 #define NUM_ITEMS 5
@@ -141,6 +149,11 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     showOutOfSyncWarning(true);
     connect(ui->labelWalletStatus, SIGNAL(clicked()), this, SLOT(handleOutOfSyncWarningClicks()));
     connect(ui->labelTransactionsStatus, SIGNAL(clicked()), this, SLOT(handleOutOfSyncWarningClicks()));
+
+    // Network Status panel (Overview dashboard, slice 1)
+    buildNetworkStatusPanel();
+    netStatusTimer = new QTimer(this);
+    connect(netStatusTimer, SIGNAL(timeout()), this, SLOT(updateNetworkStatus()));
 }
 
 void OverviewPage::handleTransactionClicked(const QModelIndex &index)
@@ -210,6 +223,16 @@ void OverviewPage::setClientModel(ClientModel *model)
         // Show warning if this is a prerelease version
         connect(model, SIGNAL(alertsChanged(QString)), this, SLOT(updateAlerts(QString)));
         updateAlerts(model->getStatusBarWarnings());
+
+        // Keep the Network Status panel live.
+        connect(model, SIGNAL(numBlocksChanged(int,QDateTime,double,bool)),
+                this, SLOT(updateNetworkStatus()));
+        connect(model, SIGNAL(numConnectionsChanged(int)),
+                this, SLOT(updateNetworkStatus()));
+        connect(model, SIGNAL(mempoolSizeChanged(long,size_t)),
+                this, SLOT(updateNetworkStatus()));
+        netStatusTimer->start(15000);
+        updateNetworkStatus();
     }
 }
 
@@ -270,4 +293,77 @@ void OverviewPage::showOutOfSyncWarning(bool fShow)
 {
     ui->labelWalletStatus->setVisible(fShow);
     ui->labelTransactionsStatus->setVisible(fShow);
+}
+
+// ── Network Status panel ────────────────────────────────────────────────────
+// A live, honest readout of node telemetry, all from data the node already
+// has. Difficulty and network hashrate are deliberately left out: BadCoin is a
+// five-algorithm chain, so a single difficulty or hashrate number would be
+// misleading. Those belong in a per-algorithm view (a later slice).
+
+void OverviewPage::buildNetworkStatusPanel()
+{
+    QGroupBox *box = new QGroupBox(tr("Network Status"), this);
+    box->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    QGridLayout *grid = new QGridLayout(box);
+
+    netSyncValue      = new QLabel(QStringLiteral("-"));
+    netHeightValue    = new QLabel(QStringLiteral("-"));
+    netConnValue      = new QLabel(QStringLiteral("-"));
+    netNetworkValue   = new QLabel(QStringLiteral("-"));
+    netLastBlockValue = new QLabel(QStringLiteral("-"));
+    netMempoolValue   = new QLabel(QStringLiteral("-"));
+
+    QLabel *values[6] = { netSyncValue, netHeightValue, netConnValue,
+                          netNetworkValue, netLastBlockValue, netMempoolValue };
+    const QString captions[6] = { tr("Status"), tr("Height"), tr("Connections"),
+                                  tr("Network"), tr("Last block"), tr("Mempool") };
+    for (int i = 0; i < 6; ++i) {
+        const int col = i % 3;
+        const int row = (i / 3) * 2;
+        QLabel *caption = new QLabel(captions[i]);
+        QFont cf = caption->font();
+        cf.setBold(true);
+        caption->setFont(cf);
+        grid->addWidget(caption,   row,     col);
+        grid->addWidget(values[i], row + 1, col);
+    }
+    grid->setColumnStretch(0, 1);
+    grid->setColumnStretch(1, 1);
+    grid->setColumnStretch(2, 1);
+
+    ui->topLayout->addWidget(box);
+}
+
+void OverviewPage::updateNetworkStatus()
+{
+    if (!clientModel)
+        return;
+
+    netSyncValue->setText(clientModel->inInitialBlockDownload()
+                          ? tr("Syncing") : tr("Synchronized"));
+    netHeightValue->setText(QString::number(clientModel->getNumBlocks()));
+    netConnValue->setText(QString::number(clientModel->getNumConnections()));
+
+    QString net = QString::fromStdString(Params().NetworkIDString());
+    if (net == "main")          net = tr("Mainnet");
+    else if (net == "test")     net = tr("Testnet");
+    else if (net == "regtest")  net = tr("Regtest");
+    netNetworkValue->setText(net);
+
+    const QDateTime last = clientModel->getLastBlockDate();
+    if (last.isValid()) {
+        const qint64 secs = last.secsTo(QDateTime::currentDateTime());
+        QString ago;
+        if (secs < 0)          ago = tr("just now");
+        else if (secs < 90)    ago = tr("%1s ago").arg(secs);
+        else if (secs < 5400)  ago = tr("%1m ago").arg(secs / 60);
+        else                   ago = tr("%1h ago").arg(secs / 3600);
+        netLastBlockValue->setText(GUIUtil::dateTimeStr(last) + "  (" + ago + ")");
+    } else {
+        netLastBlockValue->setText(tr("unknown"));
+    }
+
+    netMempoolValue->setText(tr("%1 tx").arg(
+        QString::number((qlonglong)clientModel->getMempoolSize())));
 }
