@@ -51,22 +51,75 @@ HelpMessageDialog::HelpMessageDialog(QWidget *parent, bool about) :
     {
         setWindowTitle(tr("About %1").arg(tr(PACKAGE_NAME)));
 
-        /// HTML-format the license message from the core
-        QString licenseInfo = QString::fromStdString(LicenseInfo());
-        QString licenseInfoHTML = licenseInfo;
-        // Make URLs clickable
-        QRegExp uri("<(.*)>", Qt::CaseSensitive, QRegExp::RegExp2);
-        uri.setMinimal(true); // use non-greedy matching
-        licenseInfoHTML.replace(uri, "<a href=\"\\1\">\\1</a>");
-        // Replace newlines with HTML breaks
-        licenseInfoHTML.replace("\n", "<br>");
+        // Badcoin: an identity-forward About panel. The version line is the
+        // real build version; the rest is the Phoenix Edition story and a
+        // network snapshot whose figures come from the consensus code.
+        const QString br = QStringLiteral("<br>");
+        const QString rule = QStringLiteral("<hr>");
+
+        QString aboutHTML;
+        aboutHTML += "<p><b>" + version + "</b>" + br
+                   + "<b>" + tr("Phoenix Edition") + "</b>" + br
+                   + "<i>" + tr("Crypto Mining for People with Bad Computers") + "</i></p>";
+
+        aboutHTML += "<p>" + tr(
+            "Badcoin is an open source community blockchain created for education, "
+            "experimentation, and entertainment. It is built to make mining accessible: "
+            "multiple proof-of-work algorithms, and a welcome for everyday hardware rather "
+            "than only industrial mining operations.") + "</p>";
+
+        aboutHTML += "<p><b>"
+                   + tr("Mine BAD. Learn crypto. Break things. Build things.")
+                   + "</b></p>";
+
+        aboutHTML += rule + "<p><b>" + tr("Mission") + "</b>" + br
+                   + tr("Make blockchain participation inclusive.") + br
+                   + tr("Support miners with GOOD computers, BAD computers, and everything in between.") + br
+                   + tr("Be a playground for learning distributed systems, wallets, mining, and crypto economics.")
+                   + "</p>";
+
+        aboutHTML += rule + "<p><b>" + tr("Network") + "</b>" + br
+                   + tr("Algorithms: SHA256d, Scrypt, Groestl, Skein, Yescrypt") + br
+                   + tr("Maximum supply: 21,000,000,000 BAD") + br
+                   + tr("Block reward: 2,170 BAD, reduced by periodic halving") + br
+                   + tr("Block cadence: about 1 minute aggregate, about 5 minutes per algorithm") + br
+                   + tr("Difficulty retargeting: DarkGravityWave v3") + br
+                   + tr("Chain launched: November 2018")
+                   + "</p>";
+
+        aboutHTML += rule + "<p><b>" + tr("Community") + "</b>" + br
+                   + tr("Website") + ": <a href=\"https://badcoin.net\">badcoin.net</a>" + br
+                   + tr("Telegram") + ": @badcoinnet" + br
+                   + tr("Source") + ": <a href=\"https://github.com/badcoin-project/badcoin\">github.com/badcoin-project/badcoin</a>"
+                   + "</p>";
+
+        aboutHTML += rule + "<p><b>" + tr("Contributors") + "</b>" + br
+                   + tr("Joel Comm, Co-Founder") + br
+                   + tr("Travis Wright, Co-Founder") + br
+                   + tr("Marshall Long, Blockchain Architecture") + br
+                   + tr("And the open source community of developers and miners.")
+                   + "</p>";
+
+        aboutHTML += rule + "<p><b>" + tr("Open Source") + "</b>" + br
+                   + tr("Badcoin Core builds on Bitcoin Core and Myriad Core, with OpenSSL and "
+                        "other open source libraries. Distributed under the MIT License.") + br
+                   + "<i>" + tr("This is experimental software. Only mine what you are willing to learn with.") + "</i>"
+                   + "</p>";
+
+        aboutHTML += rule + "<p><b>"
+                   + tr("Burned Once. Built Back Better. Stay BAD.")
+                   + "</b></p>";
 
         ui->aboutMessage->setTextFormat(Qt::RichText);
+        ui->aboutMessage->setOpenExternalLinks(true);
         ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-        text = version + "\n" + licenseInfo;
-        ui->aboutMessage->setText(version + "<br><br>" + licenseInfoHTML);
+        ui->aboutMessage->setText(aboutHTML);
         ui->aboutMessage->setWordWrap(true);
         ui->helpMessage->setVisible(false);
+
+        // Plain-text fallback used by printToConsole().
+        text = version + "\n" + tr("Phoenix Edition") + "\n"
+             + tr("Crypto Mining for People with Bad Computers");
     } else {
         setWindowTitle(tr("Command-line options"));
         QString header = tr("Usage:") + "\n" +
