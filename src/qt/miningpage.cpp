@@ -8,6 +8,9 @@
 #include <qt/rpcconsole.h>
 #include <qt/walletmodel.h>
 
+#include <amount.h>
+
+#include <QButtonGroup>
 #include <QComboBox>
 #include <QDateTime>
 #include <QDir>
@@ -41,6 +44,8 @@
 #include <cmath>
 #include <exception>
 #include <string>
+#include <utility>
+#include <vector>
 
 // ===========================================================================
 // MiningWorker: unchanged Solo-mode worker
@@ -116,9 +121,9 @@ void MiningWorker::doWork()
 // ===========================================================================
 
 RewardChart::RewardChart(QWidget *parent)
-    : QWidget(parent), unitLabel("BAD")
+    : QWidget(parent), unitLabel("BAD"), m_range(RangeWeek)
 {
-    setMinimumHeight(140);
+    setMinimumHeight(160);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 }
 
@@ -143,6 +148,25 @@ void RewardChart::setUnitLabel(const QString &label)
     update();
 }
 
+void RewardChart::setHistory(const QList<QPair<QDateTime, double> > &cumulativeHistory)
+{
+    // Replace the chart's data with a full time-sorted cumulative history.
+    points.clear();
+    for (const QPair<QDateTime, double> &h : cumulativeHistory) {
+        Pt pt;
+        pt.ts = h.first;
+        pt.val = h.second;
+        points.append(pt);
+    }
+    update();
+}
+
+void RewardChart::setRange(Range range)
+{
+    m_range = range;
+    update();
+}
+
 void RewardChart::paintEvent(QPaintEvent *)
 {
     QPainter p(this);
@@ -150,7 +174,7 @@ void RewardChart::paintEvent(QPaintEvent *)
 
     const QRect r = rect();
     const int pad = 12;
-    const int yAxisW = 60;   // left gutter: vertical axis = reward amount
+    const int yAxisW = 64;   // left gutter: vertical axis = reward amount
     const int xAxisH = 16;   // bottom gutter: horizontal axis = time
     QRect plot = r.adjusted(pad + yAxisW, pad + 18, -pad, -pad - xAxisH);
 
@@ -159,40 +183,82 @@ void RewardChart::paintEvent(QPaintEvent *)
     p.setPen(QColor(220, 220, 220));
     p.drawRect(plot);
 
-    // Title (top-left)
+    // Resolve the selected time window.
+    const QDateTime now = QDateTime::currentDateTime();
+    QDateTime windowStart;
+    QString rangeTitle;
+    QString xFormat;
+    switch (m_range) {
+    case RangeDay:
+        windowStart = now.addDays(-1);
+        rangeTitle = QStringLiteral("Mining Rewards - last 24 hours");
+        xFormat = QStringLiteral("HH:mm");
+        break;
+    case RangeMonth:
+        windowStart = now.addMonths(-1);
+        rangeTitle = QStringLiteral("Mining Rewards - last month");
+        xFormat = QStringLiteral("MMM d");
+        break;
+    case RangeYear:
+        windowStart = now.addYears(-1);
+        rangeTitle = QStringLiteral("Mining Rewards - last year");
+        xFormat = QStringLiteral("MMM yyyy");
+        break;
+    case RangeWeek:
+    default:
+        windowStart = now.addDays(-7);
+        rangeTitle = QStringLiteral("Mining Rewards - last 7 days");
+        xFormat = QStringLiteral("MMM d");
+        break;
+    }
+
+    // Title (top-left) names the active range.
     p.setPen(QColor(80, 80, 80));
     QFont titleFont = p.font();
     titleFont.setBold(true);
     p.setFont(titleFont);
-    p.drawText(QPoint(pad, pad + 12), QStringLiteral("Mining Rewards"));
+    p.drawText(QPoint(pad, pad + 12), rangeTitle);
     p.setFont(QFont());
 
-    if (points.isEmpty()) {
+    // Split the data: points before the window set the baseline (total
+    // already earned when the window opened); points inside it are plotted.
+    double baseline = 0.0;
+    QList<Pt> windowed;
+    for (const Pt &pt : points) {
+        if (pt.ts <= windowStart)
+            baseline = pt.val;
+        else if (pt.ts <= now)
+            windowed.append(pt);
+    }
+
+    if (windowed.isEmpty()) {
         p.setPen(QColor(160, 160, 160));
-        p.drawText(plot, Qt::AlignCenter,
-                   QStringLiteral("No rewards yet. Start mining to see your earnings."));
+        const QString msg = points.isEmpty()
+            ? QStringLiteral("No rewards yet. Start mining to see your earnings.")
+            : QStringLiteral("No rewards in this period.");
+        p.drawText(plot, Qt::AlignCenter, msg);
         return;
     }
 
-    // Compute ranges
-    const QDateTime t0 = points.first().ts;
-    const QDateTime t1 = points.last().ts;
-    qint64 span = t0.msecsTo(t1);
-    const bool singlePoint = (points.size() == 1) || (span < 1);
-    if (span < 1) span = 1;     // avoid divide-by-zero
-    double maxVal = 0;
-    for (const Pt &pt : points) {
-        if (pt.val > maxVal) maxVal = pt.val;
+    // Values are measured from the window's start, so the curve rises from 0.
+    double maxVal = 0.0;
+    for (const Pt &pt : windowed) {
+        const double v = pt.val - baseline;
+        if (v > maxVal) maxVal = v;
     }
-    if (maxVal <= 0) maxVal = 1;
+    if (maxVal <= 0.0) maxVal = 1.0;
 
-    // Running total (top-right corner) so it is not mistaken for an axis
+    const double windowTotal = windowed.last().val - baseline;
+    qint64 span = windowStart.msecsTo(now);
+    if (span < 1) span = 1;     // avoid divide-by-zero
+
+    // Total earned in this window (top-right corner).
     {
-        QString totalLbl = QString::number(points.last().val, 'f',
-                               (points.last().val < 10 ? 2 : 0))
-                           + " " + unitLabel;
+        const QString totalLbl =
+            QString::number(windowTotal, 'f', (windowTotal < 10 ? 2 : 0))
+            + " " + unitLabel;
         p.setPen(QColor(90, 90, 90));
-        p.drawText(QRect(r.right() - 200 - pad, pad, 200, 14),
+        p.drawText(QRect(r.right() - 220 - pad, pad, 220, 14),
                    Qt::AlignRight, totalLbl);
     }
 
@@ -202,66 +268,52 @@ void RewardChart::paintEvent(QPaintEvent *)
     p.setPen(QColor(120, 120, 120));
 
     // Vertical axis = reward amount: max at the top, 0 at the bottom.
-    // The gutter is wide enough that large numbers are not clipped.
-    QString topLbl = QString::number(maxVal, 'f', (maxVal < 10 ? 2 : 0));
+    const QString topLbl = QString::number(maxVal, 'f', (maxVal < 10 ? 2 : 0));
     p.drawText(QRect(pad, plot.top() - 4, yAxisW - 6, 14),
                Qt::AlignRight, topLbl);
     p.drawText(QRect(pad, plot.bottom() - 8, yAxisW - 6, 14),
                Qt::AlignRight, QStringLiteral("0"));
 
-    // Horizontal axis = time: start time at the left, latest time at the right.
-    if (singlePoint) {
-        p.drawText(QRect(plot.left(), plot.bottom() + 2, plot.width(), 13),
-                   Qt::AlignHCenter, t1.toString(QStringLiteral("HH:mm:ss")));
-    } else {
-        p.drawText(QRect(plot.left(), plot.bottom() + 2, 110, 13),
-                   Qt::AlignLeft, t0.toString(QStringLiteral("HH:mm:ss")));
-        p.drawText(QRect(plot.right() - 110, plot.bottom() + 2, 110, 13),
-                   Qt::AlignRight, t1.toString(QStringLiteral("HH:mm:ss")));
-    }
+    // Horizontal axis = time: window start at the left, "now" at the right.
+    p.drawText(QRect(plot.left(), plot.bottom() + 2, 130, 13),
+               Qt::AlignLeft, windowStart.toString(xFormat));
+    p.drawText(QRect(plot.right() - 130, plot.bottom() + 2, 130, 13),
+               Qt::AlignRight, QStringLiteral("now"));
     p.setFont(QFont());
 
-    if (singlePoint) {
-        // A single reward: just a dot, no misleading fill triangle.
-        double y = plot.bottom() - (points.last().val / maxVal) * plot.height();
-        p.setBrush(QColor(212, 44, 41));
-        p.setPen(Qt::NoPen);
-        p.drawEllipse(QPointF(plot.center().x(), y), 4.0, 4.0);
-        return;
-    }
-
-    // Build the line path: x = time, y = cumulative reward amount
+    // Build the line: starts at (windowStart, 0), steps up at each reward,
+    // then runs flat to "now" so a quiet spell reads as a plateau.
     QPainterPath path;
-    for (int i = 0; i < points.size(); ++i) {
-        qint64 dtMs = t0.msecsTo(points[i].ts);
-        double xFrac = double(dtMs) / double(span);
-        double yFrac = points[i].val / maxVal;
-        double x = plot.left() + xFrac * plot.width();
-        double y = plot.bottom() - yFrac * plot.height();
-        if (i == 0) path.moveTo(x, y);
-        else path.lineTo(x, y);
+    path.moveTo(plot.left(), plot.bottom());
+    double lastY = plot.bottom();
+    for (const Pt &pt : windowed) {
+        const qint64 dtMs = windowStart.msecsTo(pt.ts);
+        const double xFrac = double(dtMs) / double(span);
+        const double yFrac = (pt.val - baseline) / maxVal;
+        const double x = plot.left() + xFrac * plot.width();
+        const double y = plot.bottom() - yFrac * plot.height();
+        path.lineTo(x, y);
+        lastY = y;
     }
+    path.lineTo(plot.right(), lastY);
 
-    // Soft fill under the line
+    // Soft fill under the line.
     QPainterPath fillPath = path;
     fillPath.lineTo(plot.right(), plot.bottom());
     fillPath.lineTo(plot.left(),  plot.bottom());
     fillPath.closeSubpath();
     p.fillPath(fillPath, QColor(212, 44, 41, 42));  // red accent at low opacity
 
-    // Stroke the line
+    // Stroke the line.
     QPen linePen(QColor(212, 44, 41));
     linePen.setWidth(2);
     p.setPen(linePen);
     p.drawPath(path);
 
-    // Dot on the most recent point
-    double yFrac = points.last().val / maxVal;
-    double x = plot.right();   // last point is at t1, the right edge
-    double y = plot.bottom() - yFrac * plot.height();
+    // Dot on the most recent reward.
     p.setBrush(QColor(212, 44, 41));
     p.setPen(Qt::NoPen);
-    p.drawEllipse(QPointF(x, y), 4.0, 4.0);
+    p.drawEllipse(QPointF(plot.right(), lastY), 4.0, 4.0);
 }
 
 // ===========================================================================
@@ -819,6 +871,7 @@ MiningPage::MiningPage(const PlatformStyle * /*platformStyle*/, QWidget *parent)
     , blocksMinedLabel(nullptr)
     , lastHashLabel(nullptr)
     , rewardChart(nullptr)
+    , chartRangeGroup(nullptr)
     , minerAnim(nullptr)
     , workerThread(nullptr)
     , worker(nullptr)
@@ -971,13 +1024,43 @@ void MiningPage::buildStatusSection(QVBoxLayout *main)
 
 void MiningPage::buildChartSection(QVBoxLayout *main)
 {
-    QGroupBox *chartBox = new QGroupBox(tr("Rewards (this session)"));
+    QGroupBox *chartBox = new QGroupBox(tr("Mining Rewards"));
     QVBoxLayout *chartLayout = new QVBoxLayout(chartBox);
+
+    // Time-range buttons: window the reward history to the last day, week,
+    // month or year. In solo mode the history is the wallet's real mined
+    // rewards; in pool mode it is the current session's accepted shares.
+    QHBoxLayout *rangeRow = new QHBoxLayout();
+    rangeRow->addWidget(new QLabel(tr("Show:")));
+    chartRangeGroup = new QButtonGroup(this);
+    chartRangeGroup->setExclusive(true);
+    const QString rangeNames[4] = {
+        tr("1 Day"), tr("1 Week"), tr("1 Month"), tr("1 Year")
+    };
+    QPushButton *weekButton = nullptr;
+    for (int i = 0; i < 4; ++i) {
+        QPushButton *b = new QPushButton(rangeNames[i]);
+        b->setCheckable(true);
+        chartRangeGroup->addButton(b, i);
+        rangeRow->addWidget(b);
+        if (i == RewardChart::RangeWeek)
+            weekButton = b;
+    }
+    rangeRow->addStretch();
+    chartLayout->addLayout(rangeRow);
+
+    // Default to the 1 Week view, matching RewardChart's default range.
+    if (weekButton)
+        weekButton->setChecked(true);
+
     rewardChart = new RewardChart();
     chartLayout->addWidget(rewardChart);
     minerAnim = new MinerAnimation();
     chartLayout->addWidget(minerAnim);
     main->addWidget(chartBox);
+
+    connect(chartRangeGroup, SIGNAL(idClicked(int)),
+            this, SLOT(onChartRangeChanged(int)));
 }
 
 MiningPage::~MiningPage()
@@ -996,6 +1079,51 @@ MiningPage::~MiningPage()
 void MiningPage::setWalletModel(WalletModel *_walletModel)
 {
     walletModel = _walletModel;
+    if (walletModel) {
+        // The mined-reward history grows as coinbase rewards are credited, so
+        // refresh the chart whenever the wallet balance changes.
+        connect(walletModel,
+                SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)),
+                this, SLOT(reloadRewardHistory()));
+    }
+    reloadRewardHistory();
+}
+
+void MiningPage::reloadRewardHistory()
+{
+    if (!rewardChart || !walletModel)
+        return;
+    // Real mined-reward history applies to solo mining only. In pool mode the
+    // chart keeps the live session's accepted-shares count, because pool
+    // shares are not recorded in the wallet.
+    if (modePoolRadio && modePoolRadio->isChecked())
+        return;
+
+    std::vector<std::pair<qint64, CAmount> > rewards;
+    walletModel->listMinedRewards(rewards);
+    std::sort(rewards.begin(), rewards.end());   // ascending by block time
+
+    QList<QPair<QDateTime, double> > history;
+    double cumulative = 0.0;
+    for (const std::pair<qint64, CAmount> &rw : rewards) {
+        cumulative += double(rw.second) / double(COIN);
+        history.append(qMakePair(
+            QDateTime::fromSecsSinceEpoch(rw.first), cumulative));
+    }
+    rewardChart->setHistory(history);
+}
+
+void MiningPage::onChartRangeChanged(int rangeId)
+{
+    if (!rewardChart)
+        return;
+    switch (rangeId) {
+    case 0: rewardChart->setRange(RewardChart::RangeDay);   break;
+    case 1: rewardChart->setRange(RewardChart::RangeWeek);  break;
+    case 2: rewardChart->setRange(RewardChart::RangeMonth); break;
+    case 3: rewardChart->setRange(RewardChart::RangeYear);  break;
+    default: break;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1005,6 +1133,13 @@ void MiningPage::setWalletModel(WalletModel *_walletModel)
 void MiningPage::onModeChanged()
 {
     applyModeEnablement();
+    // Solo mining charts the wallet's real reward history; pool mining charts
+    // the current session's accepted shares.
+    if (modePoolRadio && modePoolRadio->isChecked()) {
+        if (rewardChart) rewardChart->reset();
+    } else {
+        reloadRewardHistory();
+    }
 }
 
 void MiningPage::applyModeEnablement()
@@ -1165,7 +1300,7 @@ void MiningPage::startMining()
     acceptedShares = 0;
     blocksMinedLabel->setText("0");
     lastHashLabel->setText(QStringLiteral("\u2014"));
-    if (rewardChart) rewardChart->reset();
+    // The chart is set up per mode by startSolo() / startPool() below.
 
     if (modePoolRadio && modePoolRadio->isChecked()) {
         QString url = poolUrlEdit->text().trimmed();
@@ -1200,6 +1335,7 @@ void MiningPage::startSolo(const QString &addr, const QString &algo)
     startButton->setEnabled(false);
     stopButton->setEnabled(true);
     if (rewardChart) rewardChart->setUnitLabel(QStringLiteral("BAD"));
+    reloadRewardHistory();   // show the wallet's real mined-reward history
     if (minerAnim) minerAnim->setMode(MinerAnimation::Mining);
     statusLabel->setText(tr("Solo mining %1 \u2192 %2").arg(algo, addr.left(12) + QStringLiteral("\u2026")));
 }
@@ -1241,6 +1377,7 @@ void MiningPage::startPool(const QString &addr, const QString &algo, const QStri
     startButton->setEnabled(false);
     stopButton->setEnabled(true);
     if (rewardChart) rewardChart->setUnitLabel(QStringLiteral("shares"));
+    if (rewardChart) rewardChart->reset();   // pool shares are a fresh session count
     if (minerAnim) minerAnim->setMode(MinerAnimation::Mining);
     statusLabel->setText(tr("Pool mining %1 \u2192 %2").arg(algo, poolUrl));
 }
@@ -1271,12 +1408,11 @@ void MiningPage::handleBlockFound(const QString &hash)
     blocksMined++;
     blocksMinedLabel->setText(QString::number(blocksMined));
     lastHashLabel->setText(hash);
-    // Coinbase reward for Badcoin at current height is ~2169 BAD (from
-    // getblocktemplate.coinbasevalue = 216931825683 satoshis).
-    const double blockRewardBAD = 2169.31825683;
-    cumulativeRewardBAD += blockRewardBAD;
-    if (rewardChart) rewardChart->addPoint(cumulativeRewardBAD);
     if (minerAnim) minerAnim->recordBlock();
+    // Refresh the chart from the wallet's real reward history. The coinbase
+    // can take a moment to be credited; the wallet's balanceChanged signal
+    // triggers a further refresh once it is.
+    reloadRewardHistory();
 }
 
 void MiningPage::handleError(const QString &err)

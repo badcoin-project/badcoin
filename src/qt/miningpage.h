@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QList>
 #include <QObject>
+#include <QPair>
 #include <QVector>
 #include <QWidget>
 
@@ -18,6 +19,7 @@ class WalletModel;
 class PlatformStyle;
 
 QT_BEGIN_NAMESPACE
+class QButtonGroup;
 class QComboBox;
 class QLabel;
 class QLineEdit;
@@ -58,9 +60,17 @@ private:
 
 /**
  * Small custom widget that draws a cumulative-rewards line chart in the
- * status area. Each data point is (timestamp, cumulative amount). In Solo
- * mode the amount is BAD earned per block. In Pool mode the amount is
- * accepted-shares count. Self-contained: no QtCharts dependency.
+ * status area. Each data point is (timestamp, cumulative amount).
+ *
+ * In Solo mode the chart is loaded from the wallet's real mined-reward
+ * history via setHistory(): every block this wallet has ever mined. In Pool
+ * mode it plots the live accepted-shares count for the current session via
+ * addPoint() (pool shares are not recorded in the wallet).
+ *
+ * The time-range buttons (1 day / 1 week / 1 month / 1 year) call setRange();
+ * the chart then windows the data to that period and plots the rewards
+ * earned within it, starting from zero at the window's start.
+ * Self-contained: no QtCharts dependency.
  */
 class RewardChart : public QWidget
 {
@@ -68,18 +78,25 @@ class RewardChart : public QWidget
 public:
     explicit RewardChart(QWidget *parent = nullptr);
 
+    /** Time window the chart displays. */
+    enum Range { RangeDay = 0, RangeWeek = 1, RangeMonth = 2, RangeYear = 3 };
+
     void addPoint(double cumulativeAmount);
+    /** Replace the chart's data with a full, time-sorted cumulative history. */
+    void setHistory(const QList<QPair<QDateTime, double> > &cumulativeHistory);
+    void setRange(Range range);
     void reset();
     void setUnitLabel(const QString &label);  // e.g. "BAD" or "shares"
-    QSize sizeHint() const override { return QSize(480, 140); }
+    QSize sizeHint() const override { return QSize(480, 160); }
 
 protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
     struct Pt { QDateTime ts; double val; };
-    QList<Pt> points;
+    QList<Pt> points;        // (event time, cumulative all-time value)
     QString unitLabel;
+    Range m_range;
 };
 
 /**
@@ -196,6 +213,10 @@ public Q_SLOTS:
     void onExternalMinerStderr();
     void onExternalMinerFinished(int exitCode);
 
+    // Mining Rewards chart
+    void reloadRewardHistory();      // reload the chart from real wallet history
+    void onChartRangeChanged(int rangeId);
+
 private:
     // UI helpers
     void buildConfigSection(class QVBoxLayout *main);
@@ -247,6 +268,7 @@ private:
 
     // Chart
     RewardChart *rewardChart;
+    QButtonGroup *chartRangeGroup;   // the 1 day / week / month / year buttons
 
     // Animated miner under the chart
     MinerAnimation *minerAnim;

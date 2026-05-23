@@ -202,6 +202,11 @@ public:
     // to {spendable, immature} amounts. immature is coinbase still locked.
     void listAddressBalances(std::map<QString, std::pair<CAmount, CAmount> >& result) const;
 
+    // Mined-reward history for the Mining Rewards chart. Each block this
+    // wallet mined is a coinbase transaction; this returns one
+    // {block unix time, reward credited} pair per mined block.
+    void listMinedRewards(std::vector<std::pair<qint64, CAmount> >& result) const;
+
     // Remove a receiving address's address-book entry (My Addresses page;
     // the page only offers this for zero-balance addresses).
     bool removeReceivingAddress(const QString &address);
