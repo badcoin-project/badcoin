@@ -26,6 +26,7 @@
 #include <validationinterface.h>
 #include <warnings.h>
 
+#include <algorithm>
 #include <memory>
 #include <stdint.h>
 
@@ -1206,6 +1207,54 @@ UniValue submitauxblock(const JSONRPCRequest& request)
                                 request.params[1].get_str());
 }
 
+UniValue setminingalgo(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+            "setminingalgo \"algo\"\n"
+            "\nSets the proof-of-work algorithm used by local block generation\n"
+            "(generatetoaddress, getblocktemplate, and the GUI miner). This\n"
+            "mutates the in-process `miningAlgo` global and persists only for\n"
+            "the lifetime of the running node.\n"
+            "\nArguments:\n"
+            "1. algo   (string, required) One of: sha256d, scrypt, groestl, skein, yescrypt\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"algo\":    \"name\",   (string) the active algorithm name\n"
+            "  \"algo_id\": n           (numeric) the active algorithm id\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("setminingalgo", "\"scrypt\"")
+            + HelpExampleRpc("setminingalgo", "\"scrypt\"")
+        );
+
+    std::string strAlgo = request.params[0].get_str();
+    std::transform(strAlgo.begin(), strAlgo.end(), strAlgo.begin(), ::tolower);
+
+    int newAlgo;
+    if (strAlgo == "sha" || strAlgo == "sha256" || strAlgo == "sha256d") {
+        newAlgo = ALGO_SHA256D;
+    } else if (strAlgo == "scrypt") {
+        newAlgo = ALGO_SCRYPT;
+    } else if (strAlgo == "groestl" || strAlgo == "groestlsha2") {
+        newAlgo = ALGO_GROESTL;
+    } else if (strAlgo == "skein" || strAlgo == "skeinsha2") {
+        newAlgo = ALGO_SKEIN;
+    } else if (strAlgo == "yescrypt") {
+        newAlgo = ALGO_YESCRYPT;
+    } else {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            "Unknown algorithm '" + strAlgo + "'. Valid values: sha256d, scrypt, groestl, skein, yescrypt");
+    }
+
+    miningAlgo = newAlgo;
+
+    UniValue obj(UniValue::VOBJ);
+    obj.push_back(Pair("algo",    GetAlgoName(miningAlgo, GetTime(), Params().GetConsensus())));
+    obj.push_back(Pair("algo_id", miningAlgo));
+    return obj;
+}
+
 
 /* ************************************************************************** */
 
@@ -1219,6 +1268,7 @@ static const CRPCCommand commands[] =
     { "mining",             "submitblock",            &submitblock,            {"hexdata","dummy"} },
     { "mining",             "createauxblock",         &createauxblock,         {"address"} },
     { "mining",             "submitauxblock",         &submitauxblock,         {"hash", "auxpow"} },
+    { "mining",             "setminingalgo",          &setminingalgo,          {"algo"} },
 
 
     { "generating",         "generatetoaddress",      &generatetoaddress,      {"nblocks","address","maxtries"} },
