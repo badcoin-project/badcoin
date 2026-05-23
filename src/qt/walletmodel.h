@@ -202,6 +202,10 @@ public:
     // to {spendable, immature} amounts. immature is coinbase still locked.
     void listAddressBalances(std::map<QString, std::pair<CAmount, CAmount> >& result) const;
 
+    // Remove a receiving address's address-book entry (My Addresses page;
+    // the page only offers this for zero-balance addresses).
+    bool removeReceivingAddress(const QString &address);
+
     bool isLockedCoin(uint256 hash, unsigned int n) const;
     void lockCoin(COutPoint& output);
     void unlockCoin(COutPoint& output);

@@ -634,6 +634,18 @@ void WalletModel::listAddressBalances(std::map<QString, std::pair<CAmount, CAmou
     }
 }
 
+bool WalletModel::removeReceivingAddress(const QString &address)
+{
+    CTxDestination dest = DecodeDestination(address.toStdString());
+    if (!IsValidDestination(dest))
+        return false;
+    LOCK(wallet->cs_wallet);
+    // Removes the address-book entry; the address leaves the My Addresses
+    // list. The underlying key cannot be deleted from an HD wallet, but for a
+    // zero-balance address that is harmless.
+    return wallet->DelAddressBook(dest);
+}
+
 bool WalletModel::isLockedCoin(uint256 hash, unsigned int n) const
 {
     LOCK2(cs_main, wallet->cs_wallet);

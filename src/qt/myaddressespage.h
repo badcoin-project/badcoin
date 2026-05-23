@@ -14,6 +14,7 @@ QT_BEGIN_NAMESPACE
 class QPushButton;
 class QShowEvent;
 class QTableWidget;
+class QTableWidgetItem;
 QT_END_NAMESPACE
 
 /**
@@ -47,6 +48,7 @@ private Q_SLOTS:
     void onCopy();
     void onExportPrivateKey();
     void onRemove();
+    void onItemChanged(QTableWidgetItem *item);
     void updateButtons();
 
 protected:
@@ -60,6 +62,7 @@ private:
 
     const PlatformStyle *platformStyle;
     WalletModel *walletModel;
+    bool m_populating;   // true while refresh() rebuilds the table
 
     QTableWidget *table;
     QPushButton *newButton;
