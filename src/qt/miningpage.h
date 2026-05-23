@@ -7,9 +7,11 @@
 
 #include <atomic>
 
+#include <QColor>
 #include <QDateTime>
 #include <QList>
 #include <QObject>
+#include <QVector>
 #include <QWidget>
 
 class WalletModel;
@@ -19,6 +21,7 @@ QT_BEGIN_NAMESPACE
 class QComboBox;
 class QLabel;
 class QLineEdit;
+class QPainter;
 class QProcess;
 class QPushButton;
 class QRadioButton;
@@ -77,6 +80,80 @@ private:
     struct Pt { QDateTime ts; double val; };
     QList<Pt> points;
     QString unitLabel;
+};
+
+/**
+ * Animated pixel-art miner shown under the Mining Rewards chart. A native
+ * Qt port of the Badcoin Pixel Miner prototype
+ * (reference/core-wallet-prototypes/badcoin-miner.html): a parallax cave,
+ * a miner sprite and a gold-ore block, all drawn procedurally with QPainter
+ * so there are no asset files and no QtWebEngine dependency. Three states
+ * track the real mining state:
+ *   Idle        - the miner sleeps against the cave wall, "Z"s drift up.
+ *   Mining      - the miner swings the pickaxe; sparks fly, the block cracks.
+ *   Celebrating - block found: a coin burst, a gold flash, a "HA HA" bubble.
+ * Runs at ~60fps while mining and throttles to ~4fps while idle, so it costs
+ * almost no CPU when nothing is happening.
+ */
+class MinerAnimation : public QWidget
+{
+public:
+    explicit MinerAnimation(QWidget *parent = nullptr);
+
+    enum Mode { Idle = 0, Mining = 1, Celebrating = 2 };
+
+    void setMode(Mode mode);   // Idle or Mining; Celebrating is set via recordBlock()
+    void recordBlock();        // play the block-found celebration
+    QSize sizeHint() const override { return QSize(640, 160); }
+
+protected:
+    void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+    void timerEvent(QTimerEvent *event) override;
+
+private:
+    struct Particle {
+        double x, y, vx, vy;
+        int life, maxLife;
+        double size;
+        double rotPhase, rotSpeed;
+        QColor color;
+    };
+
+    void recomputeLayout();
+    void advance();
+    void applyTimerInterval();
+    void spawnImpactSparks(double gx, double gy);
+    void spawnCelebrationCoins(double gx, double gy);
+
+    void px(QPainter &p, double gx, double gy, const QColor &c,
+            double w = 1.0, double h = 1.0);
+    void drawBackground(QPainter &p);
+    void drawBlock(QPainter &p);
+    void drawMiner(QPainter &p);
+    void drawPickaxe(QPainter &p, double X, double Y, bool up);
+    void drawSleepingZs(QPainter &p, double gx, double gy);
+    void drawParticles(QPainter &p);
+    void drawSpeechBubble(QPainter &p, double gx, double gy);
+    void drawPixelText(QPainter &p, double gx, double gy, const QString &text);
+
+    Mode   m_mode;
+    bool   m_miningActive;
+    int    m_pixelSize;
+    int    m_timerId;
+    int    m_intervalMs;
+    double m_clockMs;
+    double m_bgOffset;
+    double m_minerX, m_minerBaseY, m_blockX, m_blockY;
+    int    m_blockHits;
+    bool   m_swingActive;
+    double m_swingPhase;
+    double m_screenShake;
+    double m_goldFlash;
+    double m_speechTimer;
+    bool   m_laughOpen;
+    QVector<Particle> m_sparks;
+    QVector<Particle> m_coins;
 };
 
 /**
@@ -170,6 +247,9 @@ private:
 
     // Chart
     RewardChart *rewardChart;
+
+    // Animated miner under the chart
+    MinerAnimation *minerAnim;
 
     // Solo worker
     QThread *workerThread;

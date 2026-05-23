@@ -29,13 +29,16 @@
 #include <QProcess>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QRandomGenerator>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QThread>
+#include <QTimerEvent>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 #include <exception>
 #include <string>
 
@@ -262,6 +265,539 @@ void RewardChart::paintEvent(QPaintEvent *)
 }
 
 // ===========================================================================
+// MinerAnimation: native pixel-art miner (port of badcoin-miner.html)
+// ===========================================================================
+
+namespace {
+// Earthy cave palette, ported 1:1 from the prototype's PAL table.
+const QColor MP_bgSky      ("#1a1410");
+const QColor MP_bgFar      ("#2d2218");
+const QColor MP_bgMid      ("#3d2f22");
+const QColor MP_bgNear     ("#4d3a28");
+const QColor MP_rockMid    ("#7a5840");
+const QColor MP_blockBase  ("#c0a060");
+const QColor MP_blockShade ("#806638");
+const QColor MP_blockHigh  ("#f0d488");
+const QColor MP_coinGold   ("#ffcc44");
+const QColor MP_coinShade  ("#aa7700");
+const QColor MP_skinTone   ("#d8a878");
+const QColor MP_skinShade  ("#a07050");
+const QColor MP_shirtRed   ("#a83828");
+const QColor MP_shirtShade ("#7a2418");
+const QColor MP_pantsBlue  ("#3850a0");
+const QColor MP_pantsShade ("#283878");
+const QColor MP_pickaxeWood ("#6a4830");
+const QColor MP_pickaxeHead ("#888888");
+const QColor MP_pickaxeShade("#444444");
+const QColor MP_sparkBright("#fff8c8");
+const QColor MP_sparkMid   ("#ffaa44");
+const QColor MP_crackDark  ("#1a0808");
+const QColor MP_speech     ("#ffffff");
+const QColor MP_speechText ("#1a1a1a");
+
+const int    MP_BLOCK_MAX_HITS = 8;
+const double MP_PI = 3.14159265358979323846;
+
+// Uniform random double in [0,1).
+double mpRand() { return QRandomGenerator::global()->generateDouble(); }
+}  // namespace
+
+MinerAnimation::MinerAnimation(QWidget *parent)
+    : QWidget(parent)
+    , m_mode(Idle)
+    , m_miningActive(false)
+    , m_pixelSize(4)
+    , m_timerId(0)
+    , m_intervalMs(250)
+    , m_clockMs(0.0)
+    , m_bgOffset(0.0)
+    , m_minerX(0.0), m_minerBaseY(0.0), m_blockX(0.0), m_blockY(0.0)
+    , m_blockHits(0)
+    , m_swingActive(false)
+    , m_swingPhase(0.0)
+    , m_screenShake(0.0)
+    , m_goldFlash(0.0)
+    , m_speechTimer(0.0)
+    , m_laughOpen(false)
+{
+    setFixedHeight(160);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    recomputeLayout();
+    m_timerId = startTimer(m_intervalMs);
+}
+
+void MinerAnimation::recomputeLayout()
+{
+    const int W = qMax(1, width()  / m_pixelSize);
+    const int H = qMax(1, height() / m_pixelSize);
+    m_minerX     = std::floor(W * 0.25);
+    m_minerBaseY = H - 6;
+    m_blockX     = std::floor(W * 0.45);
+    m_blockY     = H - 6;
+}
+
+void MinerAnimation::resizeEvent(QResizeEvent * /*event*/)
+{
+    recomputeLayout();
+}
+
+void MinerAnimation::applyTimerInterval()
+{
+    const int wanted = (m_mode == Idle) ? 250 : 16;
+    if (wanted == m_intervalMs && m_timerId != 0) return;
+    if (m_timerId != 0) killTimer(m_timerId);
+    m_intervalMs = wanted;
+    m_timerId = startTimer(m_intervalMs);
+}
+
+void MinerAnimation::setMode(Mode mode)
+{
+    if (mode == Celebrating) return;          // celebration is set via recordBlock()
+    m_miningActive = (mode == Mining);
+    if (m_mode == Celebrating) return;        // let the celebration finish first
+    if (m_mode != mode) {
+        m_mode = mode;
+        if (mode == Idle) {
+            m_swingActive = false;
+            m_swingPhase  = 0.0;
+        }
+    }
+    applyTimerInterval();
+    update();
+}
+
+void MinerAnimation::recordBlock()
+{
+    m_mode        = Celebrating;
+    m_blockHits   = MP_BLOCK_MAX_HITS;
+    m_swingActive = false;
+    m_swingPhase  = 0.0;
+    spawnCelebrationCoins(m_blockX + 8, m_blockY - 8);
+    m_screenShake = 6.0;
+    m_goldFlash   = 0.45;
+    m_speechTimer = 1400.0;
+    applyTimerInterval();
+    update();
+}
+
+void MinerAnimation::spawnImpactSparks(double gx, double gy)
+{
+    for (int i = 0; i < 6; ++i) {
+        const double angle = -MP_PI / 2.0 + (mpRand() - 0.5) * 1.6;
+        const double speed = 0.8 + mpRand() * 1.2;
+        Particle s;
+        s.x = gx; s.y = gy;
+        s.vx = std::cos(angle) * speed;
+        s.vy = std::sin(angle) * speed;
+        s.life = 25; s.maxLife = 25;
+        s.size = (mpRand() < 0.5) ? 1.0 : 2.0;
+        s.rotPhase = 0.0; s.rotSpeed = 0.0;
+        s.color = (mpRand() < 0.6) ? MP_sparkBright : MP_sparkMid;
+        m_sparks.append(s);
+    }
+}
+
+void MinerAnimation::spawnCelebrationCoins(double gx, double gy)
+{
+    for (int i = 0; i < 18; ++i) {
+        const double angle = -MP_PI / 2.0 + (mpRand() - 0.5) * MP_PI;
+        const double speed = 1.5 + mpRand() * 1.8;
+        Particle c;
+        c.x = gx + (mpRand() - 0.5) * 4.0;
+        c.y = gy;
+        c.vx = std::cos(angle) * speed;
+        c.vy = std::sin(angle) * speed - 1.0;
+        c.life = 90; c.maxLife = 90;
+        c.rotPhase = mpRand() * MP_PI * 2.0;
+        c.rotSpeed = 0.15 + mpRand() * 0.1;
+        c.size = 2.0;
+        c.color = MP_coinGold;
+        m_coins.append(c);
+    }
+}
+
+void MinerAnimation::advance()
+{
+    m_clockMs += m_intervalMs;
+
+    // Idle is calm: only the sleeping Z's animate, and those are computed
+    // straight from m_clockMs in paintEvent. Nothing to update here.
+    if (m_mode == Idle) return;
+
+    m_bgOffset += 0.3;
+
+    // Mining swing cycle
+    if (m_mode == Mining) {
+        if (!m_swingActive && mpRand() < 0.012) {
+            m_swingActive = true;
+            m_swingPhase  = 0.0;
+        }
+        if (m_swingActive) {
+            const double prev = m_swingPhase;
+            m_swingPhase += 0.04;
+            if (prev < 0.5 && m_swingPhase >= 0.5) {
+                // Impact frame: sparks, shake, one more crack
+                spawnImpactSparks(m_blockX, m_blockY - 8);
+                m_screenShake = 3.0;
+                if (m_blockHits < MP_BLOCK_MAX_HITS - 1)
+                    m_blockHits = qMin(m_blockHits + 1, MP_BLOCK_MAX_HITS - 1);
+            }
+            if (m_swingPhase >= 1.0) {
+                m_swingActive = false;
+                m_swingPhase  = 0.0;
+            }
+        }
+    }
+
+    // Particles
+    for (int i = m_sparks.size() - 1; i >= 0; --i) {
+        Particle &s = m_sparks[i];
+        s.x += s.vx; s.y += s.vy; s.vy += 0.08;
+        if (--s.life <= 0) m_sparks.removeAt(i);
+    }
+    for (int i = m_coins.size() - 1; i >= 0; --i) {
+        Particle &c = m_coins[i];
+        c.x += c.vx; c.y += c.vy; c.vy += 0.08;
+        c.rotPhase += c.rotSpeed;
+        if (--c.life <= 0) m_coins.removeAt(i);
+    }
+
+    // Screen-shake decay
+    if (m_screenShake > 0.0) {
+        m_screenShake *= 0.85;
+        if (m_screenShake < 0.3) m_screenShake = 0.0;
+    }
+
+    // Celebration: speech bubble, gold flash, return to the base mode
+    if (m_mode == Celebrating) {
+        if (m_speechTimer > 0.0) {
+            m_speechTimer -= m_intervalMs;
+            m_laughOpen = (int(m_clockMs / 100.0) % 2) == 0;
+        }
+        if (m_goldFlash > 0.0) {
+            m_goldFlash *= 0.88;
+            if (m_goldFlash < 0.02) m_goldFlash = 0.0;
+        }
+        if (m_speechTimer <= 0.0 && m_sparks.isEmpty() && m_coins.isEmpty()
+            && m_goldFlash == 0.0) {
+            m_blockHits = 0;
+            m_mode = m_miningActive ? Mining : Idle;
+            applyTimerInterval();
+        }
+    }
+}
+
+void MinerAnimation::timerEvent(QTimerEvent *event)
+{
+    if (event->timerId() != m_timerId) { QWidget::timerEvent(event); return; }
+    advance();
+    update();
+}
+
+void MinerAnimation::px(QPainter &p, double gx, double gy, const QColor &c,
+                        double w, double h)
+{
+    p.fillRect(QRectF(std::floor(gx) * m_pixelSize, std::floor(gy) * m_pixelSize,
+                      w * m_pixelSize, h * m_pixelSize), c);
+}
+
+void MinerAnimation::drawBackground(QPainter &p)
+{
+    const int W = qMax(1, width()  / m_pixelSize);
+    const int H = qMax(1, height() / m_pixelSize);
+
+    p.fillRect(rect(), MP_bgSky);
+
+    // Far layer: slowest parallax, jagged silhouette
+    const int offFar = int(std::floor(m_bgOffset * 0.15)) % W;
+    for (int i = 0; i < W + 4; ++i) {
+        const int xx = ((i - offFar) % W + W) % W;
+        const double seed = std::sin(i * 1.7) * 0.5 + 0.5;
+        const int hh = int(std::floor(seed * 8 + 4));
+        p.fillRect(xx * m_pixelSize, (H - hh) * m_pixelSize,
+                   m_pixelSize, hh * m_pixelSize, MP_bgFar);
+    }
+    // Mid layer
+    const int offMid = int(std::floor(m_bgOffset * 0.4)) % W;
+    for (int i = 0; i < W + 4; ++i) {
+        const int xx = ((i - offMid) % W + W) % W;
+        const double seed = std::sin(i * 0.8 + 2.3) * 0.5 + 0.5;
+        const int hh = int(std::floor(seed * 12 + 8));
+        p.fillRect(xx * m_pixelSize, (H - hh) * m_pixelSize,
+                   m_pixelSize, hh * m_pixelSize, MP_bgMid);
+    }
+    // Near ground band
+    p.fillRect(0, (H - 6) * m_pixelSize, width(), 6 * m_pixelSize, MP_bgNear);
+    // Scattered ground rocks
+    for (int i = 0; i < 8; ++i) {
+        const double seed = std::sin(i * 12.9) * 0.5 + 0.5;
+        const int xx = int(std::floor(seed * W));
+        p.fillRect(xx * m_pixelSize, (H - 6) * m_pixelSize,
+                   m_pixelSize * 2, m_pixelSize, MP_rockMid);
+    }
+}
+
+void MinerAnimation::drawBlock(QPainter &p)
+{
+    if (m_blockHits >= MP_BLOCK_MAX_HITS) return;   // shattered
+    const double X = m_blockX;
+    const double Y = m_blockY - 16;
+
+    px(p, X + 0,  Y + 0,  MP_blockBase, 16, 16);
+    px(p, X + 0,  Y + 0,  MP_blockHigh, 16, 1);
+    px(p, X + 0,  Y + 1,  MP_blockHigh, 1, 14);
+    px(p, X + 15, Y + 1,  MP_blockShade, 1, 15);
+    px(p, X + 0,  Y + 15, MP_blockShade, 16, 1);
+    // Gold ore flecks
+    px(p, X + 3,  Y + 3,  MP_coinGold, 1, 1);
+    px(p, X + 9,  Y + 5,  MP_coinGold, 1, 1);
+    px(p, X + 5,  Y + 8,  MP_coinGold, 1, 1);
+    px(p, X + 11, Y + 10, MP_coinGold, 2, 1);
+    px(p, X + 6,  Y + 12, MP_coinGold, 1, 1);
+    // Cracks accumulate with hit count
+    const double cp = double(m_blockHits) / double(MP_BLOCK_MAX_HITS);
+    if (cp > 0.15) {
+        px(p, X + 8,  Y + 4,  MP_crackDark, 1, 1);
+        px(p, X + 9,  Y + 5,  MP_crackDark, 1, 1);
+        px(p, X + 10, Y + 6,  MP_crackDark, 1, 1);
+    }
+    if (cp > 0.4) {
+        px(p, X + 7,  Y + 7,  MP_crackDark, 1, 1);
+        px(p, X + 7,  Y + 8,  MP_crackDark, 1, 1);
+        px(p, X + 7,  Y + 9,  MP_crackDark, 1, 1);
+        px(p, X + 6,  Y + 10, MP_crackDark, 1, 1);
+    }
+    if (cp > 0.65) {
+        px(p, X + 11, Y + 7,  MP_crackDark, 1, 1);
+        px(p, X + 12, Y + 8,  MP_crackDark, 1, 1);
+        px(p, X + 13, Y + 9,  MP_crackDark, 1, 1);
+        px(p, X + 4,  Y + 11, MP_crackDark, 1, 1);
+        px(p, X + 3,  Y + 12, MP_crackDark, 1, 1);
+    }
+    if (cp > 0.85) {
+        px(p, X + 5,  Y + 5,  MP_crackDark, 2, 1);
+        px(p, X + 9,  Y + 11, MP_crackDark, 2, 1);
+        px(p, X + 13, Y + 13, MP_crackDark, 1, 1);
+    }
+}
+
+void MinerAnimation::drawMiner(QPainter &p)
+{
+    const double X = m_minerX;
+    const double Y = m_minerBaseY - 18;
+
+    bool armUp = false, mouthOpen = false, leaning = false;
+    if (m_mode == Mining && m_swingActive) {
+        armUp = m_swingPhase < 0.4;
+    } else if (m_mode == Celebrating) {
+        armUp = (int(m_clockMs / 133.0) % 2) == 0;
+        mouthOpen = m_laughOpen;
+    } else {
+        leaning = true;
+    }
+
+    // Helmet
+    px(p, X + 3, Y + 0, MP_shirtRed, 6, 1);
+    px(p, X + 2, Y + 1, MP_shirtRed, 8, 2);
+    px(p, X + 4, Y + 0, MP_coinGold, 1, 1);   // helmet lamp
+
+    // Face
+    px(p, X + 3, Y + 3, MP_skinTone, 6, 4);
+    px(p, X + 3, Y + 3, MP_skinShade, 1, 4);
+    const bool sleeping = (m_mode == Idle) && (std::fmod(m_clockMs, 4000.0) < 3333.0);
+    if (sleeping) {
+        px(p, X + 4, Y + 4, MP_skinShade, 1, 1);
+        px(p, X + 7, Y + 4, MP_skinShade, 1, 1);
+    } else {
+        px(p, X + 4, Y + 4, MP_crackDark, 1, 1);
+        px(p, X + 7, Y + 4, MP_crackDark, 1, 1);
+    }
+    if (mouthOpen) {
+        px(p, X + 5, Y + 6, MP_crackDark, 2, 1);
+        px(p, X + 5, Y + 5, MP_shirtRed, 2, 1);
+    } else if (m_mode == Celebrating) {
+        px(p, X + 5, Y + 6, MP_crackDark, 2, 1);
+    } else {
+        px(p, X + 5, Y + 6, MP_skinShade, 2, 1);
+    }
+    // Beard
+    px(p, X + 3, Y + 7, MP_shirtShade, 6, 1);
+    px(p, X + 4, Y + 8, MP_shirtShade, 4, 1);
+
+    // Torso
+    px(p, X + 3, Y + 9, MP_shirtRed, 6, 4);
+    px(p, X + 3, Y + 9, MP_shirtShade, 1, 4);
+
+    // Right arm (holds the pickaxe)
+    if (armUp && (m_mode == Mining || m_mode == Celebrating)) {
+        px(p, X + 9,  Y + 8, MP_shirtRed, 1, 1);
+        px(p, X + 10, Y + 7, MP_shirtRed, 1, 1);
+        px(p, X + 11, Y + 6, MP_skinTone, 1, 1);
+    } else if (m_mode == Mining) {
+        px(p, X + 9,  Y + 10, MP_shirtRed, 1, 1);
+        px(p, X + 10, Y + 11, MP_shirtRed, 1, 1);
+        px(p, X + 11, Y + 12, MP_skinTone, 1, 1);
+    } else {
+        px(p, X + 9, Y + 10, MP_shirtRed, 1, 3);
+        px(p, X + 9, Y + 13, MP_skinTone, 1, 1);
+    }
+    // Left arm
+    px(p, X + 2, Y + 10, MP_shirtRed, 1, 3);
+    px(p, X + 2, Y + 13, MP_skinTone, 1, 1);
+
+    // Legs
+    if (leaning) {
+        px(p, X + 3, Y + 13, MP_pantsBlue, 6, 3);
+        px(p, X + 3, Y + 16, MP_crackDark, 3, 2);
+        px(p, X + 6, Y + 16, MP_crackDark, 3, 2);
+    } else {
+        px(p, X + 3, Y + 13, MP_pantsBlue,  3, 4);
+        px(p, X + 6, Y + 13, MP_pantsBlue,  3, 4);
+        px(p, X + 3, Y + 13, MP_pantsShade, 1, 4);
+        px(p, X + 6, Y + 13, MP_pantsShade, 1, 4);
+        px(p, X + 3, Y + 17, MP_crackDark,  3, 1);
+        px(p, X + 6, Y + 17, MP_crackDark,  3, 1);
+    }
+
+    // Pickaxe
+    if (m_mode == Mining || (m_mode == Celebrating && armUp)) {
+        drawPickaxe(p, X, Y, armUp);
+    } else if (leaning) {
+        px(p, X + 11, Y + 13, MP_pickaxeWood,  1, 5);
+        px(p, X + 10, Y + 12, MP_pickaxeHead,  3, 1);
+        px(p, X + 10, Y + 11, MP_pickaxeShade, 1, 1);
+        px(p, X + 12, Y + 11, MP_pickaxeShade, 1, 1);
+    }
+
+    // Sleeping Z's
+    if (m_mode == Idle)
+        drawSleepingZs(p, X + 8, Y - 2);
+}
+
+void MinerAnimation::drawPickaxe(QPainter &p, double X, double Y, bool up)
+{
+    const double handX = X + 11;
+    const double handY = up ? (Y + 6) : (Y + 12);
+    if (up) {
+        px(p, handX + 0, handY - 1, MP_pickaxeWood,  1, 1);
+        px(p, handX + 1, handY - 2, MP_pickaxeWood,  1, 1);
+        px(p, handX + 2, handY - 3, MP_pickaxeWood,  1, 1);
+        px(p, handX + 3, handY - 4, MP_pickaxeWood,  1, 1);
+        px(p, handX + 2, handY - 5, MP_pickaxeHead,  3, 1);
+        px(p, handX + 4, handY - 4, MP_pickaxeShade, 1, 1);
+        px(p, handX + 2, handY - 6, MP_pickaxeShade, 1, 1);
+    } else {
+        px(p, handX + 0, handY + 0, MP_pickaxeWood,  1, 1);
+        px(p, handX + 1, handY + 0, MP_pickaxeWood,  1, 1);
+        px(p, handX + 2, handY - 1, MP_pickaxeWood,  1, 1);
+        px(p, handX + 3, handY - 2, MP_pickaxeWood,  1, 1);
+        px(p, handX + 3, handY - 3, MP_pickaxeHead,  1, 3);
+        px(p, handX + 4, handY - 3, MP_pickaxeShade, 1, 1);
+        px(p, handX + 4, handY - 1, MP_pickaxeShade, 1, 1);
+    }
+}
+
+void MinerAnimation::drawSleepingZs(QPainter &p, double gx, double gy)
+{
+    for (int i = 0; i < 3; ++i) {
+        const double phase = std::fmod(m_clockMs / 8000.0 + i / 3.0, 1.0);
+        if (phase > 0.85) continue;
+        const int yOff = -int(std::floor(phase * 12.0));
+        const int xOff = i + int(std::floor(std::sin(phase * MP_PI) * 2.0));
+        const double alpha = (phase < 0.7) ? 1.0 : (1.0 - (phase - 0.7) / 0.15);
+        const double sz = 1 + i;
+        p.setOpacity(alpha);
+        px(p, gx + xOff,            gy + yOff,     MP_skinShade, sz, 1);
+        px(p, gx + xOff + sz - 1,   gy + yOff + 1, MP_skinShade, 1, 1);
+        px(p, gx + xOff,            gy + yOff + 2, MP_skinShade, sz, 1);
+        p.setOpacity(1.0);
+    }
+}
+
+void MinerAnimation::drawParticles(QPainter &p)
+{
+    for (const Particle &s : m_sparks) {
+        p.setOpacity(double(s.life) / double(s.maxLife));
+        px(p, std::floor(s.x), std::floor(s.y), s.color, s.size, s.size);
+    }
+    p.setOpacity(1.0);
+    for (const Particle &c : m_coins) {
+        const double alpha = (c.life > 30) ? 1.0 : (double(c.life) / 30.0);
+        p.setOpacity(alpha);
+        const double rotW = std::fabs(std::sin(c.rotPhase)) * c.size + 1.0;
+        const double x = std::floor(c.x);
+        const double y = std::floor(c.y);
+        px(p, x, y, MP_coinShade, std::ceil(rotW), c.size);
+        px(p, x, y, MP_coinGold,  qMax(1.0, std::floor(rotW)), c.size);
+    }
+    p.setOpacity(1.0);
+}
+
+void MinerAnimation::drawSpeechBubble(QPainter &p, double gx, double gy)
+{
+    if (m_speechTimer <= 0.0) return;
+    const int w = 22, h = 8;
+    const double bx = gx, by = gy - 14;
+    px(p, bx,       by,       MP_speech, w, h);
+    px(p, bx + 1,   by - 1,   MP_speech, w - 2, 1);
+    px(p, bx + 1,   by + h,   MP_speech, w - 2, 1);
+    px(p, bx - 1,   by + 1,   MP_crackDark, 1, h - 2);
+    px(p, bx + w,   by + 1,   MP_crackDark, 1, h - 2);
+    px(p, bx + 2,   by + h,   MP_speech, 2, 1);
+    px(p, bx + 3,   by + h + 1, MP_speech, 1, 1);
+    drawPixelText(p, bx + 2, by + 2, QStringLiteral("HA HA"));
+}
+
+void MinerAnimation::drawPixelText(QPainter &p, double gx, double gy, const QString &text)
+{
+    // Tiny 3x5 pixel font; only the glyphs the speech bubble needs.
+    static const int H_glyph[5][3] = {{1,0,1},{1,0,1},{1,1,1},{1,0,1},{1,0,1}};
+    static const int A_glyph[5][3] = {{0,1,0},{1,0,1},{1,1,1},{1,0,1},{1,0,1}};
+    double cx = gx;
+    for (const QChar &chRef : text) {
+        const char ch = chRef.toLatin1();
+        if (ch == 'H' || ch == 'A') {
+            const int (*glyph)[3] = (ch == 'H') ? H_glyph : A_glyph;
+            for (int r = 0; r < 5; ++r)
+                for (int c = 0; c < 3; ++c)
+                    if (glyph[r][c])
+                        px(p, cx + c, gy + r, MP_speechText, 1, 1);
+        }
+        cx += 4;   // 3 wide + 1 spacing (also covers the space character)
+    }
+}
+
+void MinerAnimation::paintEvent(QPaintEvent * /*event*/)
+{
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, false);
+
+    p.save();
+    if (m_screenShake > 0.0) {
+        const double sx = (mpRand() - 0.5) * m_screenShake;
+        const double sy = (mpRand() - 0.5) * m_screenShake;
+        p.translate(sx, sy);
+    }
+
+    drawBackground(p);
+    if (m_mode != Celebrating || m_blockHits < MP_BLOCK_MAX_HITS)
+        drawBlock(p);
+    drawMiner(p);
+    drawParticles(p);
+    if (m_mode == Celebrating && m_speechTimer > 0.0)
+        drawSpeechBubble(p, m_minerX + 8, m_minerBaseY - 18);
+
+    p.restore();
+
+    // Gold flash overlay (drawn outside the screen-shake transform)
+    if (m_goldFlash > 0.0) {
+        p.setOpacity(m_goldFlash);
+        p.fillRect(rect(), MP_coinGold);
+        p.setOpacity(1.0);
+    }
+}
+
+// ===========================================================================
 // MiningPage
 // ===========================================================================
 
@@ -283,6 +819,7 @@ MiningPage::MiningPage(const PlatformStyle * /*platformStyle*/, QWidget *parent)
     , blocksMinedLabel(nullptr)
     , lastHashLabel(nullptr)
     , rewardChart(nullptr)
+    , minerAnim(nullptr)
     , workerThread(nullptr)
     , worker(nullptr)
     , externalMiner(nullptr)
@@ -438,6 +975,8 @@ void MiningPage::buildChartSection(QVBoxLayout *main)
     QVBoxLayout *chartLayout = new QVBoxLayout(chartBox);
     rewardChart = new RewardChart();
     chartLayout->addWidget(rewardChart);
+    minerAnim = new MinerAnimation();
+    chartLayout->addWidget(minerAnim);
     main->addWidget(chartBox);
 }
 
@@ -661,6 +1200,7 @@ void MiningPage::startSolo(const QString &addr, const QString &algo)
     startButton->setEnabled(false);
     stopButton->setEnabled(true);
     if (rewardChart) rewardChart->setUnitLabel(QStringLiteral("BAD"));
+    if (minerAnim) minerAnim->setMode(MinerAnimation::Mining);
     statusLabel->setText(tr("Solo mining %1 \u2192 %2").arg(algo, addr.left(12) + QStringLiteral("\u2026")));
 }
 
@@ -701,6 +1241,7 @@ void MiningPage::startPool(const QString &addr, const QString &algo, const QStri
     startButton->setEnabled(false);
     stopButton->setEnabled(true);
     if (rewardChart) rewardChart->setUnitLabel(QStringLiteral("shares"));
+    if (minerAnim) minerAnim->setMode(MinerAnimation::Mining);
     statusLabel->setText(tr("Pool mining %1 \u2192 %2").arg(algo, poolUrl));
 }
 
@@ -718,6 +1259,7 @@ void MiningPage::stopMining()
         }
     }
     stopButton->setEnabled(false);
+    if (minerAnim) minerAnim->setMode(MinerAnimation::Idle);
 }
 
 // ---------------------------------------------------------------------------
@@ -734,6 +1276,7 @@ void MiningPage::handleBlockFound(const QString &hash)
     const double blockRewardBAD = 2169.31825683;
     cumulativeRewardBAD += blockRewardBAD;
     if (rewardChart) rewardChart->addPoint(cumulativeRewardBAD);
+    if (minerAnim) minerAnim->recordBlock();
 }
 
 void MiningPage::handleError(const QString &err)
@@ -749,6 +1292,7 @@ void MiningPage::handleWorkerFinished()
     }
     startButton->setEnabled(true);
     stopButton->setEnabled(false);
+    if (minerAnim) minerAnim->setMode(MinerAnimation::Idle);
     worker = nullptr;
     workerThread = nullptr;
 }
@@ -809,6 +1353,7 @@ void MiningPage::onExternalMinerFinished(int exitCode)
     }
     startButton->setEnabled(true);
     stopButton->setEnabled(false);
+    if (minerAnim) minerAnim->setMode(MinerAnimation::Idle);
     if (externalMiner) {
         externalMiner->deleteLater();
         externalMiner = nullptr;
