@@ -44,6 +44,10 @@
 #endif
 #endif
 
+// On Apple (macOS 15+), <sys/endian.h> provides be32dec/be32enc as inline
+// functions (pulled in via scrypt.h), which collide with these fallbacks.
+// Skip them on Apple and use the SDK versions; define them elsewhere.
+#if !defined(__APPLE__)
 static inline uint32_t be32dec(const void *pp)
 {
 	const uint8_t *p = (uint8_t const *)pp;
@@ -59,6 +63,7 @@ static inline void be32enc(void *pp, uint32_t x)
 	p[1] = (x >> 16) & 0xff;
 	p[0] = (x >> 24) & 0xff;
 }
+#endif  /* !defined(__APPLE__) */
 
 typedef struct HMAC_SHA256Context {
 	SHA256_CTX ictx;
