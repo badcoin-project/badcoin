@@ -21,8 +21,10 @@ namespace Ui {
 }
 
 QT_BEGIN_NAMESPACE
+class QGroupBox;
 class QLabel;
 class QModelIndex;
+class QProgressBar;
 class QTimer;
 QT_END_NAMESPACE
 
@@ -71,9 +73,18 @@ private:
     QTimer *netStatusTimer;
     void buildNetworkStatusPanel();
 
+    // Coin Maturity panel (Overview dashboard, slice 2)
+    QGroupBox *maturityBox;
+    QProgressBar *maturityBar;
+    QLabel *maturityCountValue;
+    QLabel *maturityNextValue;
+    QLabel *maturityAllValue;
+    void buildCoinMaturityPanel();
+
 private Q_SLOTS:
     void updateDisplayUnit();
     void updateNetworkStatus();
+    void updateCoinMaturity();
     void handleTransactionClicked(const QModelIndex &index);
     void updateAlerts(const QString &warnings);
     void updateWatchOnlyLabels(bool showWatchOnly);

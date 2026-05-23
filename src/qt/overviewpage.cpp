@@ -24,7 +24,9 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QPainter>
+#include <QProgressBar>
 #include <QTimer>
+#include <QVBoxLayout>
 
 #define DECORATION_SIZE 54
 #define NUM_ITEMS 5
@@ -154,6 +156,9 @@ OverviewPage::OverviewPage(const PlatformStyle *platformStyle, QWidget *parent) 
     buildNetworkStatusPanel();
     netStatusTimer = new QTimer(this);
     connect(netStatusTimer, SIGNAL(timeout()), this, SLOT(updateNetworkStatus()));
+
+    // Coin Maturity panel (Overview dashboard, slice 2)
+    buildCoinMaturityPanel();
 }
 
 void OverviewPage::handleTransactionClicked(const QModelIndex &index)
@@ -231,6 +236,8 @@ void OverviewPage::setClientModel(ClientModel *model)
                 this, SLOT(updateNetworkStatus()));
         connect(model, SIGNAL(mempoolSizeChanged(long,size_t)),
                 this, SLOT(updateNetworkStatus()));
+        connect(model, SIGNAL(numBlocksChanged(int,QDateTime,double,bool)),
+                this, SLOT(updateCoinMaturity()));
         netStatusTimer->start(15000);
         updateNetworkStatus();
     }
@@ -257,6 +264,7 @@ void OverviewPage::setWalletModel(WalletModel *model)
         setBalance(model->getBalance(), model->getUnconfirmedBalance(), model->getImmatureBalance(),
                    model->getWatchBalance(), model->getWatchUnconfirmedBalance(), model->getWatchImmatureBalance());
         connect(model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(setBalance(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)));
+        connect(model, SIGNAL(balanceChanged(CAmount,CAmount,CAmount,CAmount,CAmount,CAmount)), this, SLOT(updateCoinMaturity()));
 
         connect(model->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
 
@@ -266,6 +274,7 @@ void OverviewPage::setWalletModel(WalletModel *model)
 
     // update the display unit, to not use the default ("BTC")
     updateDisplayUnit();
+    updateCoinMaturity();
 }
 
 void OverviewPage::updateDisplayUnit()
@@ -366,4 +375,79 @@ void OverviewPage::updateNetworkStatus()
 
     netMempoolValue->setText(tr("%1 tx").arg(
         QString::number((qlonglong)clientModel->getMempoolSize())));
+}
+
+// ── Coin Maturity panel ─────────────────────────────────────────────────────
+// Shows how the wallet's immature (freshly mined) coinbase coins are
+// progressing toward spendable. Visible only when there are immature coins.
+
+namespace {
+QString formatMaturityEta(qint64 seconds)
+{
+    if (seconds <= 0)   return QStringLiteral("now");
+    if (seconds < 90)   return QStringLiteral("under a minute");
+    if (seconds < 5400) return QString("about %1 min").arg(seconds / 60);
+    return QString("about %1h %2m").arg(seconds / 3600).arg((seconds % 3600) / 60);
+}
+}
+
+void OverviewPage::buildCoinMaturityPanel()
+{
+    maturityBox = new QGroupBox(tr("Coin Maturity"), this);
+    maturityBox->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    QVBoxLayout *outer = new QVBoxLayout(maturityBox);
+
+    maturityBar = new QProgressBar();
+    maturityBar->setRange(0, 101);
+    maturityBar->setValue(0);
+    maturityBar->setFormat(tr("next reward: %v / %m confirmations"));
+    outer->addWidget(maturityBar);
+
+    QGridLayout *grid = new QGridLayout();
+    maturityCountValue = new QLabel(QStringLiteral("-"));
+    maturityNextValue  = new QLabel(QStringLiteral("-"));
+    maturityAllValue   = new QLabel(QStringLiteral("-"));
+    QLabel *vals[3] = { maturityCountValue, maturityNextValue, maturityAllValue };
+    const QString caps[3] = { tr("Maturing rewards"), tr("Next reward unlocks"),
+                              tr("All spendable in") };
+    for (int i = 0; i < 3; ++i) {
+        QLabel *cap = new QLabel(caps[i]);
+        QFont cf = cap->font();
+        cf.setBold(true);
+        cap->setFont(cf);
+        grid->addWidget(cap,     0, i);
+        grid->addWidget(vals[i], 1, i);
+        grid->setColumnStretch(i, 1);
+    }
+    outer->addLayout(grid);
+
+    ui->topLayout->addWidget(maturityBox);
+    maturityBox->setVisible(false);   // shown only when immature coins exist
+}
+
+void OverviewPage::updateCoinMaturity()
+{
+    if (!walletModel || !maturityBox)
+        return;
+
+    const WalletModel::ImmatureMaturity m = walletModel->getImmatureMaturity();
+    if (m.count == 0) {
+        maturityBox->setVisible(false);
+        return;
+    }
+    maturityBox->setVisible(true);
+
+    // 101 confirmations is maturity; progress = 101 - blocks remaining.
+    int done = 101 - m.soonestBlocks;
+    if (done < 0)   done = 0;
+    if (done > 101) done = 101;
+    maturityBar->setValue(done);
+
+    maturityCountValue->setText(QString::number(m.count));
+
+    const qint64 spacing = Params().GetConsensus().nPowTargetSpacing;
+    maturityNextValue->setText(formatMaturityEta((qint64)m.soonestBlocks * spacing)
+        + tr(" (%1 blocks)").arg(m.soonestBlocks));
+    maturityAllValue->setText(formatMaturityEta((qint64)m.latestBlocks * spacing)
+        + tr(" (%1 blocks)").arg(m.latestBlocks));
 }

@@ -646,6 +646,35 @@ bool WalletModel::removeReceivingAddress(const QString &address)
     return wallet->DelAddressBook(dest);
 }
 
+WalletModel::ImmatureMaturity WalletModel::getImmatureMaturity() const
+{
+    // Walk the wallet's coinbase transactions that have not yet matured and
+    // summarise: how many, how much, and how far the soonest and latest are
+    // from spendable. GetBlocksToMaturity() is 0 once a coinbase is spendable.
+    ImmatureMaturity m;
+    LOCK2(cs_main, wallet->cs_wallet);
+    for (const std::pair<const uint256, CWalletTx>& entry : wallet->mapWallet) {
+        const CWalletTx& wtx = entry.second;
+        if (!wtx.IsCoinBase())
+            continue;
+        const int toMaturity = wtx.GetBlocksToMaturity();
+        if (toMaturity <= 0)
+            continue;   // already mature, or not in the main chain
+        const CAmount credit = wtx.GetImmatureCredit();
+        if (credit <= 0)
+            continue;
+        m.count++;
+        m.total += credit;
+        if (m.count == 1 || toMaturity < m.soonestBlocks) {
+            m.soonestBlocks = toMaturity;
+            m.soonestAmount = credit;
+        }
+        if (m.count == 1 || toMaturity > m.latestBlocks)
+            m.latestBlocks = toMaturity;
+    }
+    return m;
+}
+
 bool WalletModel::isLockedCoin(uint256 hash, unsigned int n) const
 {
     LOCK2(cs_main, wallet->cs_wallet);

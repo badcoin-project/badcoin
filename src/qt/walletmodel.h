@@ -206,6 +206,16 @@ public:
     // the page only offers this for zero-balance addresses).
     bool removeReceivingAddress(const QString &address);
 
+    // Coinbase maturity summary for the Overview "Coin Maturity" panel.
+    struct ImmatureMaturity {
+        int     count = 0;          // immature coinbase transactions
+        int     soonestBlocks = 0;  // blocks until the next one matures
+        int     latestBlocks = 0;   // blocks until the last one matures
+        CAmount soonestAmount = 0;  // value of the next-to-mature coinbase
+        CAmount total = 0;          // total immature amount
+    };
+    ImmatureMaturity getImmatureMaturity() const;
+
     bool isLockedCoin(uint256 hash, unsigned int n) const;
     void lockCoin(COutPoint& output);
     void unlockCoin(COutPoint& output);
