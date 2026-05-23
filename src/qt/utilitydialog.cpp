@@ -25,6 +25,7 @@
 
 #include <QCloseEvent>
 #include <QLabel>
+#include <QPixmap>
 #include <QRegExp>
 #include <QTextTable>
 #include <QTextCursor>
@@ -116,6 +117,13 @@ HelpMessageDialog::HelpMessageDialog(QWidget *parent, bool about) :
         ui->aboutMessage->setText(aboutHTML);
         ui->aboutMessage->setWordWrap(true);
         ui->helpMessage->setVisible(false);
+
+        // Phoenix mascot in place of the generic coin logo.
+        QPixmap phoenix(":/icons/badcoin_phoenix");
+        if (!phoenix.isNull()) {
+            ui->aboutLogo->setPixmap(phoenix.scaled(220, 220,
+                Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        }
 
         // Plain-text fallback used by printToConsole().
         text = version + "\n" + tr("Phoenix Edition") + "\n"
