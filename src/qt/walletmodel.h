@@ -213,6 +213,7 @@ public:
         int     latestBlocks = 0;   // blocks until the last one matures
         CAmount soonestAmount = 0;  // value of the next-to-mature coinbase
         CAmount total = 0;          // total immature amount
+        double  avgBlockSeconds = 0; // observed recent seconds per block
     };
     ImmatureMaturity getImmatureMaturity() const;
 

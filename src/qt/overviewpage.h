@@ -79,6 +79,7 @@ private:
     QLabel *maturityCountValue;
     QLabel *maturityNextValue;
     QLabel *maturityAllValue;
+    QLabel *maturityPaceValue;
     void buildCoinMaturityPanel();
 
 private Q_SLOTS:

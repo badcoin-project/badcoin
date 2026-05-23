@@ -407,10 +407,12 @@ void OverviewPage::buildCoinMaturityPanel()
     maturityCountValue = new QLabel(QStringLiteral("-"));
     maturityNextValue  = new QLabel(QStringLiteral("-"));
     maturityAllValue   = new QLabel(QStringLiteral("-"));
-    QLabel *vals[3] = { maturityCountValue, maturityNextValue, maturityAllValue };
-    const QString caps[3] = { tr("Maturing rewards"), tr("Next reward unlocks"),
-                              tr("All spendable in") };
-    for (int i = 0; i < 3; ++i) {
+    maturityPaceValue  = new QLabel(QStringLiteral("-"));
+    QLabel *vals[4] = { maturityCountValue, maturityNextValue,
+                        maturityAllValue, maturityPaceValue };
+    const QString caps[4] = { tr("Maturing rewards"), tr("Next reward unlocks"),
+                              tr("All spendable in"), tr("Block pace") };
+    for (int i = 0; i < 4; ++i) {
         QLabel *cap = new QLabel(caps[i]);
         QFont cf = cap->font();
         cf.setBold(true);
@@ -445,9 +447,21 @@ void OverviewPage::updateCoinMaturity()
 
     maturityCountValue->setText(QString::number(m.count));
 
-    const qint64 spacing = Params().GetConsensus().nPowTargetSpacing;
-    maturityNextValue->setText(formatMaturityEta((qint64)m.soonestBlocks * spacing)
+    // Estimate from the chain's observed block pace; fall back to the
+    // 1-minute target only when the chain is too short to measure a pace.
+    double spacing = m.avgBlockSeconds;
+    const bool observed = spacing > 0.0;
+    if (!observed)
+        spacing = (double)Params().GetConsensus().nPowTargetSpacing;
+
+    maturityNextValue->setText(formatMaturityEta((qint64)(m.soonestBlocks * spacing))
         + tr(" (%1 blocks)").arg(m.soonestBlocks));
-    maturityAllValue->setText(formatMaturityEta((qint64)m.latestBlocks * spacing)
+    maturityAllValue->setText(formatMaturityEta((qint64)(m.latestBlocks * spacing))
         + tr(" (%1 blocks)").arg(m.latestBlocks));
+
+    QString pace = (spacing < 90.0)
+        ? tr("~%1 sec/block").arg((int)(spacing + 0.5))
+        : tr("~%1 min/block").arg(QString::number(spacing / 60.0, 'f', 1));
+    pace += observed ? tr(" (observed)") : tr(" (target)");
+    maturityPaceValue->setText(pace);
 }

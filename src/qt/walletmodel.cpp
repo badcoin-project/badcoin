@@ -672,6 +672,20 @@ WalletModel::ImmatureMaturity WalletModel::getImmatureMaturity() const
         if (m.count == 1 || toMaturity > m.latestBlocks)
             m.latestBlocks = toMaturity;
     }
+
+    // Observed recent block cadence, so the maturity ETAs reflect reality
+    // rather than the 1-minute target (the live chain currently runs slower).
+    const CBlockIndex *tip = chainActive.Tip();
+    if (tip) {
+        const int window = tip->nHeight < 100 ? tip->nHeight : 100;
+        const CBlockIndex *back = (window > 0)
+            ? tip->GetAncestor(tip->nHeight - window) : nullptr;
+        if (back) {
+            const int64_t span = tip->GetBlockTime() - back->GetBlockTime();
+            if (span > 0)
+                m.avgBlockSeconds = double(span) / double(window);
+        }
+    }
     return m;
 }
 
