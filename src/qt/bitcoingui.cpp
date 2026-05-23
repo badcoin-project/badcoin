@@ -330,6 +330,7 @@ void BitcoinGUI::createActions()
     myAddressesAction->setStatusTip(tr("View and manage the wallet's receiving addresses"));
     myAddressesAction->setToolTip(myAddressesAction->statusTip());
     myAddressesAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
+    myAddressesAction->setCheckable(true);
     tabGroup->addAction(myAddressesAction);
 
 #ifdef ENABLE_WALLET
@@ -350,6 +351,7 @@ void BitcoinGUI::createActions()
     connect(miningAction,  SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
     connect(miningAction,  SIGNAL(triggered()), this, SLOT(gotoMiningPage()));
     connect(myAddressesAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+    connect(myAddressesAction, SIGNAL(triggered()), this, SLOT(gotoMyAddressesPage()));
 #endif // ENABLE_WALLET
 
     quitAction = new QAction(platformStyle->TextColorIcon(":/icons/quit"), tr("E&xit"), this);
@@ -419,7 +421,6 @@ void BitcoinGUI::createActions()
         connect(verifyMessageAction, SIGNAL(triggered()), this, SLOT(gotoVerifyMessageTab()));
         connect(usedSendingAddressesAction, SIGNAL(triggered()), walletFrame, SLOT(usedSendingAddresses()));
         connect(usedReceivingAddressesAction, SIGNAL(triggered()), walletFrame, SLOT(usedReceivingAddresses()));
-        connect(myAddressesAction, SIGNAL(triggered()), walletFrame, SLOT(usedReceivingAddresses()));
         connect(openAction, SIGNAL(triggered()), this, SLOT(openClicked()));
     }
 #endif // ENABLE_WALLET
@@ -722,6 +723,12 @@ void BitcoinGUI::gotoMiningPage()
 {
     miningAction->setChecked(true);
     if (walletFrame) walletFrame->gotoMiningPage();
+}
+
+void BitcoinGUI::gotoMyAddressesPage()
+{
+    myAddressesAction->setChecked(true);
+    if (walletFrame) walletFrame->gotoMyAddressesPage();
 }
 
 void BitcoinGUI::gotoReceiveCoinsPage()

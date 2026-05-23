@@ -605,6 +605,35 @@ void WalletModel::listCoins(std::map<QString, std::vector<COutput> >& mapCoins) 
     }
 }
 
+void WalletModel::listAddressBalances(std::map<QString, std::pair<CAmount, CAmount> >& result) const
+{
+    // Per-address balance for the My Addresses page. For each unspent output
+    // the wallet can spend, add its value to {spendable, immature} for the
+    // destination address. immature = coinbase still inside the maturity window.
+    result.clear();
+    LOCK2(cs_main, wallet->cs_wallet);
+    for (const std::pair<const uint256, CWalletTx>& entry : wallet->mapWallet) {
+        const CWalletTx& wtx = entry.second;
+        if (wtx.GetDepthInMainChain() < 0)
+            continue;
+        const bool immatureCoinbase = wtx.IsCoinBase() && wtx.GetBlocksToMaturity() > 0;
+        for (unsigned int i = 0; i < wtx.tx->vout.size(); ++i) {
+            if (wallet->IsSpent(entry.first, i))
+                continue;
+            if (!(wallet->IsMine(wtx.tx->vout[i]) & ISMINE_SPENDABLE))
+                continue;
+            CTxDestination dest;
+            if (!ExtractDestination(wtx.tx->vout[i].scriptPubKey, dest))
+                continue;
+            const QString addr = QString::fromStdString(EncodeDestination(dest));
+            if (immatureCoinbase)
+                result[addr].second += wtx.tx->vout[i].nValue;
+            else
+                result[addr].first += wtx.tx->vout[i].nValue;
+        }
+    }
+}
+
 bool WalletModel::isLockedCoin(uint256 hash, unsigned int n) const
 {
     LOCK2(cs_main, wallet->cs_wallet);

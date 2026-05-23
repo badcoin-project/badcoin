@@ -68,6 +68,8 @@ public Q_SLOTS:
     void gotoHistoryPage();
     /** Switch to mining page */
     void gotoMiningPage();
+    /** Switch to My Addresses page */
+    void gotoMyAddressesPage();
     /** Switch to receive coins page */
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */

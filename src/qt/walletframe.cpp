@@ -131,6 +131,13 @@ void WalletFrame::gotoMiningPage()
         i.value()->gotoMiningPage();
 }
 
+void WalletFrame::gotoMyAddressesPage()
+{
+    QMap<QString, WalletView*>::const_iterator i;
+    for (i = mapWalletViews.constBegin(); i != mapWalletViews.constEnd(); ++i)
+        i.value()->gotoMyAddressesPage();
+}
+
 void WalletFrame::gotoReceiveCoinsPage()
 {
     QMap<QString, WalletView*>::const_iterator i;
