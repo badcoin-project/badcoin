@@ -28,13 +28,23 @@ void
 PBKDF2_SHA256(const uint8_t *passwd, size_t passwdlen, const uint8_t *salt,
     size_t saltlen, uint64_t c, uint8_t *buf, size_t dkLen);
 
+// On Apple (macOS 15+), <sys/endian.h> provides le32dec/le32enc as inline
+// functions, which collide with our fallback definitions and cause
+// "redefinition" errors. Include the SDK version on Apple and skip our
+// fallbacks; define them ourselves on every other platform.
+#if defined(__APPLE__)
+#include <sys/endian.h>
+#else
+#ifndef le32dec
 static inline uint32_t le32dec(const void *pp)
 {
         const uint8_t *p = (uint8_t const *)pp;
         return ((uint32_t)(p[0]) + ((uint32_t)(p[1]) << 8) +
             ((uint32_t)(p[2]) << 16) + ((uint32_t)(p[3]) << 24));
 }
+#endif
 
+#ifndef le32enc
 static inline void le32enc(void *pp, uint32_t x)
 {
         uint8_t *p = (uint8_t *)pp;
@@ -43,4 +53,6 @@ static inline void le32enc(void *pp, uint32_t x)
         p[2] = (x >> 16) & 0xff;
         p[3] = (x >> 24) & 0xff;
 }
+#endif
+#endif  /* !defined(__APPLE__) */
 #endif
