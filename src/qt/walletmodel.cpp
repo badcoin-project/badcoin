@@ -696,11 +696,18 @@ bool WalletModel::importVanityAddress(const QString &wif, const QString &label, 
     }
     const CKeyID keyID = pubkey.GetID();
 
+    // Label the destination of the wallet's default address type. That is the
+    // address the Vanity Address page actually generated and showed the user
+    // (a P2SH-segwit "B..." address by default), not the legacy "C..." form.
+    OutputType addrType = (g_address_type == OUTPUT_TYPE_NONE)
+        ? OUTPUT_TYPE_P2SH_SEGWIT : g_address_type;
+    const CTxDestination vanityDest = GetDestinationForKey(pubkey, addrType);
+
     LOCK2(cs_main, wallet->cs_wallet);
     wallet->MarkDirty();
     // Label the address whether or not the key is new, so a re-save still
     // updates the name shown on the My Addresses tab.
-    wallet->SetAddressBook(keyID, label.toStdString(), "receive");
+    wallet->SetAddressBook(vanityDest, label.toStdString(), "receive");
 
     if (wallet->HaveKey(keyID))
         return true;   // already in the wallet; nothing more to do

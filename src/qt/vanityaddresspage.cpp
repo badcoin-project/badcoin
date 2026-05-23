@@ -10,6 +10,7 @@
 #include <base58.h>
 #include <key.h>
 #include <pubkey.h>
+#include <wallet/wallet.h>
 
 #include <algorithm>
 #include <cmath>
@@ -25,9 +26,12 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QList>
+#include <QLocale>
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSet>
 #include <QStringList>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -41,13 +45,29 @@
 static const QString kBase58Alphabet =
     QStringLiteral("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
 
+// Return the characters of a set as a sorted, space-separated string.
+static QString sortedChars(const QSet<QChar> &chars)
+{
+    QList<QChar> list = chars.values();
+    std::sort(list.begin(), list.end());
+    QString out;
+    for (const QChar &c : list) {
+        if (!out.isEmpty())
+            out += QLatin1Char(' ');
+        out += c;
+    }
+    return out;
+}
+
 // ---------------------------------------------------------------------------
 // VanityWorker
 // ---------------------------------------------------------------------------
 
-VanityWorker::VanityWorker(const QStringList &_prefixes, QObject *parent)
+VanityWorker::VanityWorker(const QStringList &_prefixes, OutputType _addressType,
+                           QObject *parent)
     : QObject(parent)
     , prefixes(_prefixes)
+    , addressType(_addressType)
     , stopRequested(false)
 {
 }
@@ -57,14 +77,31 @@ void VanityWorker::doWork()
     quint64 tested = 0;
     QStringList remaining = prefixes;
 
+    // Characters genuinely seen in real addresses, so the search can screen
+    // out impossible prefixes and guide the user with real data.
+    QSet<QChar> firstSeen;
+    QSet<QChar> secondSeen;
+    QSet<QString> headsSeen;          // distinct two-character address heads
+    bool screened = false;
+    const quint64 kScreenAt = 30000;  // sample size before the screen runs
+
     while (!stopRequested.load() && !remaining.isEmpty()) {
-        // Generate a genuine, fresh keypair and derive its legacy address.
+        // Generate a genuine, fresh keypair and derive its address using the
+        // wallet's own address type, so the result is a real, usable address.
         CKey key;
         key.MakeNewKey(true /* compressed */);
         const CPubKey pubkey = key.GetPubKey();
-        const QString address =
-            QString::fromStdString(EncodeDestination(pubkey.GetID()));
+        const QString address = QString::fromStdString(
+            EncodeDestination(GetDestinationForKey(pubkey, addressType)));
         ++tested;
+
+        if (!address.isEmpty()) {
+            firstSeen.insert(address.at(0));
+            if (address.size() >= 2) {
+                secondSeen.insert(address.at(1));
+                headsSeen.insert(address.left(2));
+            }
+        }
 
         for (int i = 0; i < remaining.size(); ++i) {
             if (address.startsWith(remaining.at(i), Qt::CaseSensitive)) {
@@ -76,12 +113,34 @@ void VanityWorker::doWork()
             }
         }
 
-        // Report progress a few times a second without flooding the UI.
-        if ((tested & 0x7FF) == 0)
+        // One-time reachability screen: once a solid sample of real addresses
+        // has been generated, drop any prefix whose opening characters never
+        // actually occur. It is then genuinely impossible, not merely hard.
+        if (!screened && tested >= kScreenAt) {
+            screened = true;
+            for (int i = remaining.size() - 1; i >= 0; --i) {
+                const QString &pfx = remaining.at(i);
+                bool reachable = true;
+                if (!firstSeen.contains(pfx.at(0)))
+                    reachable = false;
+                else if (pfx.size() >= 2 && !headsSeen.contains(pfx.left(2)))
+                    reachable = false;
+                if (!reachable) {
+                    Q_EMIT unreachable(pfx);
+                    remaining.removeAt(i);
+                }
+            }
+        }
+
+        // Report progress and observed characters a few times a second.
+        if ((tested & 0x7FF) == 0) {
             Q_EMIT progress(tested);
+            Q_EMIT observedChars(sortedChars(firstSeen), sortedChars(secondSeen));
+        }
     }
 
     Q_EMIT progress(tested);
+    Q_EMIT observedChars(sortedChars(firstSeen), sortedChars(secondSeen));
     Q_EMIT finished();
 }
 
@@ -96,6 +155,7 @@ VanityAddressPage::VanityAddressPage(const PlatformStyle *_platformStyle, QWidge
     , prefixEdit(nullptr)
     , checkLabel(nullptr)
     , difficultyLabel(nullptr)
+    , guidanceLabel(nullptr)
     , startButton(nullptr)
     , stopButton(nullptr)
     , statusValue(nullptr)
@@ -106,6 +166,7 @@ VanityAddressPage::VanityAddressPage(const PlatformStyle *_platformStyle, QWidge
     , resultsTable(nullptr)
     , copyButton(nullptr)
     , saveButton(nullptr)
+    , deleteButton(nullptr)
     , workerThread(nullptr)
     , worker(nullptr)
     , uiTimer(nullptr)
@@ -129,13 +190,15 @@ VanityAddressPage::VanityAddressPage(const PlatformStyle *_platformStyle, QWidge
     QVBoxLayout *inputLayout = new QVBoxLayout(inputBox);
 
     QLabel *prefixHint = new QLabel(tr(
-        "Enter one prefix per line. Every Badcoin address begins with a capital "
-        "\"B\", so your prefix must too (for example: BAD, BoB, BadPix)."));
+        "Enter one prefix per line. Every Badcoin address starts with a capital "
+        "\"B\", so your prefix must too (for example: BAD, BEST, BANK). The "
+        "character right after the B can only take certain values; if you pick "
+        "an impossible one, the search detects it quickly and tells you."));
     prefixHint->setWordWrap(true);
     inputLayout->addWidget(prefixHint);
 
     prefixEdit = new QPlainTextEdit();
-    prefixEdit->setPlaceholderText(tr("BAD\nBoB"));
+    prefixEdit->setPlaceholderText(tr("BAD\nBEST"));
     prefixEdit->setMaximumHeight(90);
     inputLayout->addWidget(prefixEdit);
 
@@ -148,6 +211,11 @@ VanityAddressPage::VanityAddressPage(const PlatformStyle *_platformStyle, QWidge
     difficultyLabel->setWordWrap(true);
     difficultyLabel->setTextFormat(Qt::PlainText);
     inputLayout->addWidget(difficultyLabel);
+
+    guidanceLabel = new QLabel();
+    guidanceLabel->setWordWrap(true);
+    guidanceLabel->setTextFormat(Qt::PlainText);
+    inputLayout->addWidget(guidanceLabel);
 
     layout->addWidget(inputBox);
 
@@ -200,7 +268,7 @@ VanityAddressPage::VanityAddressPage(const PlatformStyle *_platformStyle, QWidge
         "Each match below is a real keypair. The private key is held only for "
         "this session: use \"Save to wallet\" to keep it. Once saved, you can "
         "receive coins to the address and export its private key from the "
-        "My Addresses tab."));
+        "My Addresses tab. \"Delete\" removes a row you do not want."));
     resultsHint->setWordWrap(true);
     resultsLayout->addWidget(resultsHint);
 
@@ -221,12 +289,15 @@ VanityAddressPage::VanityAddressPage(const PlatformStyle *_platformStyle, QWidge
     resultsLayout->addWidget(resultsTable);
 
     QHBoxLayout *resultsButtons = new QHBoxLayout();
-    copyButton = new QPushButton(tr("Copy address"));
-    saveButton = new QPushButton(tr("Save to wallet"));
+    copyButton   = new QPushButton(tr("Copy address"));
+    saveButton   = new QPushButton(tr("Save to wallet"));
+    deleteButton = new QPushButton(tr("Delete"));
     copyButton->setEnabled(false);
     saveButton->setEnabled(false);
+    deleteButton->setEnabled(false);
     resultsButtons->addWidget(copyButton);
     resultsButtons->addWidget(saveButton);
+    resultsButtons->addWidget(deleteButton);
     resultsButtons->addStretch();
     resultsLayout->addLayout(resultsButtons);
 
@@ -239,8 +310,9 @@ VanityAddressPage::VanityAddressPage(const PlatformStyle *_platformStyle, QWidge
     connect(startButton, SIGNAL(clicked()), this, SLOT(onStart()));
     connect(stopButton,  SIGNAL(clicked()), this, SLOT(onStop()));
     connect(resultsTable, SIGNAL(itemSelectionChanged()), this, SLOT(onSelectionChanged()));
-    connect(copyButton, SIGNAL(clicked()), this, SLOT(onCopyAddress()));
-    connect(saveButton, SIGNAL(clicked()), this, SLOT(onSaveToWallet()));
+    connect(copyButton,   SIGNAL(clicked()), this, SLOT(onCopyAddress()));
+    connect(saveButton,   SIGNAL(clicked()), this, SLOT(onSaveToWallet()));
+    connect(deleteButton, SIGNAL(clicked()), this, SLOT(onDeleteResult()));
     connect(uiTimer, SIGNAL(timeout()), this, SLOT(tick()));
 
     refreshValidation();
@@ -264,16 +336,12 @@ void VanityAddressPage::setWalletModel(WalletModel *_walletModel)
 
 // -- Prefix validation -------------------------------------------------------
 
-QString VanityAddressPage::prefixError(const QString &prefix)
+QString VanityAddressPage::prefixError(const QString &prefix) const
 {
     if (prefix.isEmpty())
         return tr("the prefix is empty.");
 
-    if (prefix.at(0) != QChar('B'))
-        return tr("every Badcoin address begins with a capital \"B\", so a "
-                  "prefix that starts with \"%1\" can never occur.")
-                  .arg(prefix.at(0));
-
+    // Characters outside Base58 can never appear in any address.
     for (int i = 0; i < prefix.size(); ++i) {
         const QChar c = prefix.at(i);
         if (!kBase58Alphabet.contains(c)) {
@@ -283,14 +351,35 @@ QString VanityAddressPage::prefixError(const QString &prefix)
                       "l (lower-case L).").arg(c);
         }
     }
+
+    // First character. Badcoin addresses (the wallet's default type) begin
+    // with a capital B; once a search has run we use what was really seen.
+    const QString firstChars = observedFirst.isEmpty()
+        ? QStringLiteral("B") : QString(observedFirst).remove(QLatin1Char(' '));
+    if (!firstChars.contains(prefix.at(0))) {
+        return tr("Badcoin addresses begin with \"%1\", so a prefix starting "
+                  "with \"%2\" can never occur.")
+                  .arg(firstChars).arg(prefix.at(0));
+    }
+
+    // Second character, once a search has shown which ones really occur.
+    if (prefix.size() >= 2 && !observedSecond.isEmpty()) {
+        const QString secondSet = QString(observedSecond).remove(QLatin1Char(' '));
+        if (!secondSet.contains(prefix.at(1))) {
+            return tr("no Badcoin address has \"%1\" as its second character. "
+                      "After the leading B it must be one of:  %2")
+                      .arg(prefix.at(1)).arg(observedSecond);
+        }
+    }
     return QString();
 }
 
 double VanityAddressPage::expectedAttempts(const QString &prefix)
 {
-    // The leading 'B' is structurally guaranteed on every address, so it costs
-    // nothing. Each further character must be matched by chance, about 1 in 58.
-    // This is an estimate: it assumes the characters are evenly distributed.
+    // The leading character is structurally guaranteed, so it costs nothing.
+    // Each further character must be matched by chance. This is an estimate:
+    // it assumes the characters are evenly distributed, which they are not
+    // exactly, so treat it as a rough order-of-magnitude figure.
     const int n = prefix.size();
     if (n <= 1)
         return 1.0;
@@ -367,11 +456,11 @@ void VanityAddressPage::refreshValidation()
         const QString err = prefixError(p);
         if (err.isEmpty()) {
             const double att = expectedAttempts(p);
-            feedback << tr("OK: \"%1\" is a reachable prefix.").arg(p);
+            feedback << tr("\"%1\": ready to search.").arg(p);
             diffs << tr("    \"%1\": about %2 addresses to test on average.")
                        .arg(p).arg(humanCount(att));
         } else {
-            feedback << tr("Cannot use \"%1\": %2").arg(p).arg(err);
+            feedback << tr("\"%1\": %2").arg(p).arg(err);
         }
     }
 
@@ -384,13 +473,30 @@ void VanityAddressPage::refreshValidation()
         difficultyLabel->setText(QString());
     } else {
         difficultyLabel->setText(tr(
-            "Difficulty estimate (assumes characters are evenly distributed; "
-            "real results vary, sometimes a lot):\n%1\n\n"
+            "Difficulty estimate (rough; characters are not perfectly evenly "
+            "distributed, so real results vary):\n%1\n\n"
             "How long this takes depends on your computer's speed, which is "
             "shown once the search starts.").arg(diffs.join(QStringLiteral("\n"))));
     }
 
     updateButtons();
+}
+
+void VanityAddressPage::updateGuidance()
+{
+    QStringList parts;
+    if (!observedSecond.isEmpty()) {
+        const QString first = observedFirst.isEmpty()
+            ? QStringLiteral("B") : observedFirst;
+        parts << tr("From the addresses generated so far: every address starts "
+                    "with %1, and the character right after it is one of:  %2")
+                    .arg(first).arg(observedSecond);
+    }
+    if (!unreachablePrefixes.isEmpty()) {
+        parts << tr("Skipped as impossible (no Badcoin address can begin this "
+                    "way):  %1").arg(unreachablePrefixes.join(QStringLiteral(", ")));
+    }
+    guidanceLabel->setText(parts.join(QStringLiteral("\n\n")));
 }
 
 // -- Search lifecycle --------------------------------------------------------
@@ -408,9 +514,20 @@ void VanityAddressPage::onStart()
     if (prefixes.isEmpty())
         return;
 
+    // Generate the wallet's own address type, so a found address is exactly
+    // the kind the wallet hands out (and starts with the same letter).
+    OutputType addrType = OUTPUT_TYPE_P2SH_SEGWIT;
+    if (walletModel) {
+        const OutputType t = walletModel->getDefaultAddressType();
+        if (t != OUTPUT_TYPE_NONE)
+            addrType = t;
+    }
+
     testedCount = 0;
     matchesFound = 0;
     pendingPrefixes = prefixes;
+    unreachablePrefixes.clear();
+    updateGuidance();
 
     testedValue->setText("0");
     speedValue->setText(tr("measuring..."));
@@ -421,7 +538,7 @@ void VanityAddressPage::onStart()
     setRunning(true);
     clock.start();
 
-    worker = new VanityWorker(prefixes);
+    worker = new VanityWorker(prefixes, addrType);
     workerThread = new QThread(this);
     worker->moveToThread(workerThread);
 
@@ -429,6 +546,9 @@ void VanityAddressPage::onStart()
     connect(worker, SIGNAL(found(QString,QString,QString)),
             this,   SLOT(onFound(QString,QString,QString)));
     connect(worker, SIGNAL(progress(quint64)), this, SLOT(onProgress(quint64)));
+    connect(worker, SIGNAL(unreachable(QString)), this, SLOT(onUnreachable(QString)));
+    connect(worker, SIGNAL(observedChars(QString,QString)),
+            this,   SLOT(onObservedChars(QString,QString)));
     connect(worker, SIGNAL(finished()), this,         SLOT(onWorkerFinished()));
     connect(worker, SIGNAL(finished()), workerThread, SLOT(quit()));
     connect(worker, SIGNAL(finished()), worker,       SLOT(deleteLater()));
@@ -449,6 +569,21 @@ void VanityAddressPage::onStop()
 void VanityAddressPage::onProgress(quint64 tested)
 {
     testedCount = tested;
+}
+
+void VanityAddressPage::onUnreachable(const QString &prefix)
+{
+    pendingPrefixes.removeAll(prefix);
+    if (!unreachablePrefixes.contains(prefix))
+        unreachablePrefixes << prefix;
+    updateGuidance();
+}
+
+void VanityAddressPage::onObservedChars(const QString &firstChars, const QString &secondChars)
+{
+    observedFirst = firstChars;
+    observedSecond = secondChars;
+    updateGuidance();
 }
 
 void VanityAddressPage::onFound(const QString &prefix, const QString &address, const QString &wif)
@@ -494,12 +629,19 @@ void VanityAddressPage::onWorkerFinished()
     // One last refresh of the live counters.
     tick();
 
-    if (matchesFound == 0)
+    const int skipped = unreachablePrefixes.size();
+    if (matchesFound == 0 && skipped > 0 && pendingPrefixes.isEmpty())
+        statusValue->setText(tr("Stopped. None of those prefixes can occur in a "
+                                "Badcoin address."));
+    else if (matchesFound == 0)
         statusValue->setText(tr("Stopped. No matches found."));
-    else if (pendingPrefixes.isEmpty())
+    else if (pendingPrefixes.isEmpty() && skipped == 0)
         statusValue->setText(tr("Done. Every prefix was found."));
+    else if (pendingPrefixes.isEmpty())
+        statusValue->setText(tr("Done. %1 found; %2 skipped as impossible.")
+                                .arg(matchesFound).arg(skipped));
     else
-        statusValue->setText(tr("Stopped. %1 found, %2 prefix(es) still open.")
+        statusValue->setText(tr("Stopped. %1 found, %2 still open.")
                                 .arg(matchesFound).arg(pendingPrefixes.size()));
     updateButtons();
 }
@@ -619,6 +761,32 @@ void VanityAddressPage::onSaveToWallet()
     updateButtons();
 }
 
+void VanityAddressPage::onDeleteResult()
+{
+    const int row = resultsTable->currentRow();
+    if (row < 0)
+        return;
+
+    QTableWidgetItem *statusItem = resultsTable->item(row, COL_STATUS);
+    const bool saved = statusItem && statusItem->data(Qt::UserRole).toBool();
+
+    QString question = tr("Remove this address from the results list?");
+    if (saved)
+        question += tr("\n\nIt has already been saved to your wallet. Removing it "
+                       "here does not remove it from the wallet; use the Remove "
+                       "button on the My Addresses tab for that.");
+    else
+        question += tr("\n\nIt has not been saved, so its private key will be "
+                       "discarded.");
+
+    if (QMessageBox::question(this, tr("Delete result"), question,
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+        return;
+
+    resultsTable->removeRow(row);
+    updateButtons();
+}
+
 // -- UI state ----------------------------------------------------------------
 
 void VanityAddressPage::setRunning(bool _running)
@@ -636,6 +804,7 @@ void VanityAddressPage::updateButtons()
     const int row = resultsTable ? resultsTable->currentRow() : -1;
     const bool hasSelection = row >= 0;
     copyButton->setEnabled(hasSelection);
+    deleteButton->setEnabled(hasSelection);
 
     bool canSave = false;
     if (hasSelection && walletModel) {
