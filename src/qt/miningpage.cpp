@@ -147,14 +147,16 @@ void RewardChart::paintEvent(QPaintEvent *)
 
     const QRect r = rect();
     const int pad = 12;
-    QRect plot = r.adjusted(pad + 48, pad + 18, -pad, -pad - 18);
+    const int yAxisW = 60;   // left gutter: vertical axis = reward amount
+    const int xAxisH = 16;   // bottom gutter: horizontal axis = time
+    QRect plot = r.adjusted(pad + yAxisW, pad + 18, -pad, -pad - xAxisH);
 
     // Background
     p.fillRect(r, QColor(252, 252, 252));
     p.setPen(QColor(220, 220, 220));
     p.drawRect(plot);
 
-    // Title
+    // Title (top-left)
     p.setPen(QColor(80, 80, 80));
     QFont titleFont = p.font();
     titleFont.setBold(true);
@@ -173,25 +175,59 @@ void RewardChart::paintEvent(QPaintEvent *)
     const QDateTime t0 = points.first().ts;
     const QDateTime t1 = points.last().ts;
     qint64 span = t0.msecsTo(t1);
-    if (span < 1) span = 1;     // avoid divide-by-zero; force a minimum width
+    const bool singlePoint = (points.size() == 1) || (span < 1);
+    if (span < 1) span = 1;     // avoid divide-by-zero
     double maxVal = 0;
     for (const Pt &pt : points) {
         if (pt.val > maxVal) maxVal = pt.val;
     }
     if (maxVal <= 0) maxVal = 1;
 
-    // Y-axis labels: 0 and max
-    p.setPen(QColor(120, 120, 120));
+    // Running total (top-right corner) so it is not mistaken for an axis
+    {
+        QString totalLbl = QString::number(points.last().val, 'f',
+                               (points.last().val < 10 ? 2 : 0))
+                           + " " + unitLabel;
+        p.setPen(QColor(90, 90, 90));
+        p.drawText(QRect(r.right() - 200 - pad, pad, 200, 14),
+                   Qt::AlignRight, totalLbl);
+    }
+
     QFont axisFont = p.font();
     axisFont.setPointSize(axisFont.pointSize() - 1);
     p.setFont(axisFont);
-    QString topLbl = QString::number(maxVal, 'f', (maxVal < 10 ? 2 : 0)) + " " + unitLabel;
-    QString botLbl = QStringLiteral("0");
-    p.drawText(QRect(pad, plot.top() - 4, 44, 14), Qt::AlignRight, topLbl);
-    p.drawText(QRect(pad, plot.bottom() - 8, 44, 14), Qt::AlignRight, botLbl);
+    p.setPen(QColor(120, 120, 120));
+
+    // Vertical axis = reward amount: max at the top, 0 at the bottom.
+    // The gutter is wide enough that large numbers are not clipped.
+    QString topLbl = QString::number(maxVal, 'f', (maxVal < 10 ? 2 : 0));
+    p.drawText(QRect(pad, plot.top() - 4, yAxisW - 6, 14),
+               Qt::AlignRight, topLbl);
+    p.drawText(QRect(pad, plot.bottom() - 8, yAxisW - 6, 14),
+               Qt::AlignRight, QStringLiteral("0"));
+
+    // Horizontal axis = time: start time at the left, latest time at the right.
+    if (singlePoint) {
+        p.drawText(QRect(plot.left(), plot.bottom() + 2, plot.width(), 13),
+                   Qt::AlignHCenter, t1.toString(QStringLiteral("HH:mm:ss")));
+    } else {
+        p.drawText(QRect(plot.left(), plot.bottom() + 2, 110, 13),
+                   Qt::AlignLeft, t0.toString(QStringLiteral("HH:mm:ss")));
+        p.drawText(QRect(plot.right() - 110, plot.bottom() + 2, 110, 13),
+                   Qt::AlignRight, t1.toString(QStringLiteral("HH:mm:ss")));
+    }
     p.setFont(QFont());
 
-    // Build path
+    if (singlePoint) {
+        // A single reward: just a dot, no misleading fill triangle.
+        double y = plot.bottom() - (points.last().val / maxVal) * plot.height();
+        p.setBrush(QColor(212, 44, 41));
+        p.setPen(Qt::NoPen);
+        p.drawEllipse(QPointF(plot.center().x(), y), 4.0, 4.0);
+        return;
+    }
+
+    // Build the line path: x = time, y = cumulative reward amount
     QPainterPath path;
     for (int i = 0; i < points.size(); ++i) {
         qint64 dtMs = t0.msecsTo(points[i].ts);
@@ -203,14 +239,12 @@ void RewardChart::paintEvent(QPaintEvent *)
         else path.lineTo(x, y);
     }
 
-    // Fill under the line, softly
+    // Soft fill under the line
     QPainterPath fillPath = path;
-    if (!points.isEmpty()) {
-        fillPath.lineTo(plot.right(),  plot.bottom());
-        fillPath.lineTo(plot.left(),   plot.bottom());
-        fillPath.closeSubpath();
-        p.fillPath(fillPath, QColor(212, 44, 41, 42));  // red accent at low opacity
-    }
+    fillPath.lineTo(plot.right(), plot.bottom());
+    fillPath.lineTo(plot.left(),  plot.bottom());
+    fillPath.closeSubpath();
+    p.fillPath(fillPath, QColor(212, 44, 41, 42));  // red accent at low opacity
 
     // Stroke the line
     QPen linePen(QColor(212, 44, 41));
@@ -218,24 +252,13 @@ void RewardChart::paintEvent(QPaintEvent *)
     p.setPen(linePen);
     p.drawPath(path);
 
-    // Dot at the most recent point
-    if (!points.isEmpty()) {
-        qint64 dtMs = t0.msecsTo(points.last().ts);
-        double xFrac = span > 0 ? double(dtMs) / double(span) : 1.0;
-        double yFrac = points.last().val / maxVal;
-        double x = plot.left() + xFrac * plot.width();
-        double y = plot.bottom() - yFrac * plot.height();
-        p.setBrush(QColor(212, 44, 41));
-        p.setPen(Qt::NoPen);
-        p.drawEllipse(QPointF(x, y), 4.0, 4.0);
-    }
-
-    // Current value label, bottom-right of the plot
-    p.setPen(QColor(90, 90, 90));
-    QString cur = QString("%1 %2").arg(QString::number(points.last().val, 'f',
-        (points.last().val < 10 ? 2 : 0))).arg(unitLabel);
-    p.drawText(QRect(plot.right() - 200, plot.bottom() + 4, 200, 14),
-               Qt::AlignRight, cur);
+    // Dot on the most recent point
+    double yFrac = points.last().val / maxVal;
+    double x = plot.right();   // last point is at t1, the right edge
+    double y = plot.bottom() - yFrac * plot.height();
+    p.setBrush(QColor(212, 44, 41));
+    p.setPen(Qt::NoPen);
+    p.drawEllipse(QPointF(x, y), 4.0, 4.0);
 }
 
 // ===========================================================================
