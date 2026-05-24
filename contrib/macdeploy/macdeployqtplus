@@ -219,8 +219,23 @@ def getLcRpaths(binaryPath):
                     break
     return rpaths
 
-def resolveRpathRef(ref, rpaths):
-    # Resolve @rpath/foo against the loader's LC_RPATH entries; fall back to common Homebrew prefixes.
+def loaderArch(binaryPath):
+    # Returns "arm64", "x86_64", or None if unreadable / mixed / unknown.
+    otoolbin = os.getenv("OTOOL", "otool")
+    try:
+        out = subprocess.check_output(["lipo", "-archs", binaryPath]).decode().strip()
+    except Exception:
+        return None
+    archs = out.split()
+    if len(archs) == 1:
+        return archs[0]
+    return None  # universal or empty — no preference
+
+def resolveRpathRef(ref, rpaths, loaderPath=None):
+    # Resolve @rpath/foo against the loader's LC_RPATH entries; fall back to
+    # common Homebrew prefixes, preferring the one that matches the loader's
+    # architecture so an x86_64 build under Rosetta doesn't pull arm64 dylibs
+    # from /opt/homebrew (and vice versa).
     if not ref.startswith("@rpath/"):
         return None
     suffix = ref[len("@rpath/"):]
@@ -228,8 +243,16 @@ def resolveRpathRef(ref, rpaths):
         cand = os.path.join(rp, suffix)
         if os.path.exists(cand):
             return cand
-    for fallback in ("/opt/homebrew/lib", "/usr/local/lib"):
-        cand = os.path.join(fallback, suffix)
+    # Pick the fallback order based on loader arch.
+    fallbacks = ("/opt/homebrew/lib", "/usr/local/lib")
+    if loaderPath is not None:
+        arch = loaderArch(loaderPath)
+        if arch == "x86_64":
+            fallbacks = ("/usr/local/lib", "/opt/homebrew/lib")
+        elif arch == "arm64":
+            fallbacks = ("/opt/homebrew/lib", "/usr/local/lib")
+    for fb in fallbacks:
+        cand = os.path.join(fb, suffix)
         if os.path.exists(cand):
             return cand
     return None
@@ -259,7 +282,7 @@ def getFrameworks(binaryPath, verbose):
         if info is None:
             continue
         if info.sourceFilePath.startswith("@rpath/"):
-            resolved = resolveRpathRef(info.sourceFilePath, rpaths)
+            resolved = resolveRpathRef(info.sourceFilePath, rpaths, binaryPath)
             if resolved is None:
                 if verbose >= 1:
                     sys.stderr.write("Warning: could not resolve %s from %s; skipping.\n" % (info.sourceFilePath, binaryPath))
