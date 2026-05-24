@@ -199,6 +199,41 @@ class DeploymentInfo(object):
                     return True
         return False
 
+def getLcRpaths(binaryPath):
+    otoolbin = os.getenv("OTOOL", "otool")
+    try:
+        out = subprocess.check_output([otoolbin, "-l", binaryPath]).decode()
+    except subprocess.CalledProcessError:
+        return []
+    rpaths = []
+    lines = out.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == "cmd LC_RPATH":
+            for j in range(i + 1, min(i + 4, len(lines))):
+                s = lines[j].strip()
+                if s.startswith("path "):
+                    rp = s[len("path "):].rsplit(" (offset", 1)[0].strip()
+                    rp = rp.replace("@loader_path", os.path.dirname(binaryPath))
+                    rp = rp.replace("@executable_path", os.path.dirname(binaryPath))
+                    rpaths.append(rp)
+                    break
+    return rpaths
+
+def resolveRpathRef(ref, rpaths):
+    # Resolve @rpath/foo against the loader's LC_RPATH entries; fall back to common Homebrew prefixes.
+    if not ref.startswith("@rpath/"):
+        return None
+    suffix = ref[len("@rpath/"):]
+    for rp in rpaths:
+        cand = os.path.join(rp, suffix)
+        if os.path.exists(cand):
+            return cand
+    for fallback in ("/opt/homebrew/lib", "/usr/local/lib"):
+        cand = os.path.join(fallback, suffix)
+        if os.path.exists(cand):
+            return cand
+    return None
+
 def getFrameworks(binaryPath, verbose):
     if verbose >= 3:
         print("Inspecting with otool: " + binaryPath)
@@ -216,15 +251,26 @@ def getFrameworks(binaryPath, verbose):
     if ".framework" in binaryPath or binaryPath.endswith(".dylib"):
         otoolLines.pop(0) # Frameworks and dylibs list themselves as a dependency.
 
+    rpaths = getLcRpaths(binaryPath)
     libraries = []
     for line in otoolLines:
         line = line.replace("@loader_path", os.path.dirname(binaryPath))
         info = FrameworkInfo.fromOtoolLibraryLine(line.strip())
-        if info is not None:
-            if verbose >= 3:
-                print("Found framework:")
-                print(info)
-            libraries.append(info)
+        if info is None:
+            continue
+        if info.sourceFilePath.startswith("@rpath/"):
+            resolved = resolveRpathRef(info.sourceFilePath, rpaths)
+            if resolved is None:
+                if verbose >= 1:
+                    sys.stderr.write("Warning: could not resolve %s from %s; skipping.\n" % (info.sourceFilePath, binaryPath))
+                continue
+            # Keep installName as the original @rpath reference so install_name_tool -change finds it
+            # in the loader binary; rewrite sourceFilePath so the copy reads from the real file.
+            info.sourceFilePath = resolved
+        if verbose >= 3:
+            print("Found framework:")
+            print(info)
+        libraries.append(info)
 
     return libraries
 
