@@ -1,34 +1,82 @@
-<?xml version="1.0" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
- "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg version="1.0" xmlns="http://www.w3.org/2000/svg" width="1000pt" height="640pt" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet">
-	<!-- kate: space-indent off;
-	Copyright (c) 2015 The Bitcoin Core developers
-	Distributed under the MIT software license, see the accompanying
-	file COPYING or http://www.opensource.org/licenses/mit-license.php.
-	-->
-	<style type="text/css"><![CDATA[
-		text {
-			font-family: "Tuffy";
-			font-size: 86px;
-			fill: gray;
-			text-anchor: middle;
-		}
-	]]></style>
-	<defs>
-		<linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-			<stop offset="0%" style="stop-color:rgb(239,239,239);stop-opacity:1" />
-			<stop offset="33%" style="stop-color:rgb(239,239,239);stop-opacity:1" />
-			<stop offset="80%" style="stop-color:rgb(205,205,205);stop-opacity:1" />
-			<stop offset="100%" style="stop-color:rgb(204,204,204);stop-opacity:1" />
-		</linearGradient>
-	</defs>
-	<rect width="1000" height="640" style="fill:url(#gradient);stroke-width:0" />
-	<g transform="translate(500,0) scale(0.9, 1)">
-		<text x="0" y="114">PACKAGE_NAME</text>
-	</g>
-	<g transform="translate(0.000000,640.000000) scale(0.100000,-0.100000)"
-	fill="#000000" stroke="none">
-		<path d="M4995 3705 c-24 -23 -25 -29 -25 -165 l0 -140 -306 0 -306 0 -29 -29 c-29 -29 -29 -31 -29 -141 0 -110 0 -112 29 -141 l29 -29 306 0 306 0 0 -140 c0 -136 1 -142 25 -165 16 -17 35 -25 57 -25 29 0 72 32 306 226 180 149 274 233 278 250 13 53 -2 70 -278 299 -235 194 -277 225 -306 225 -22 0 -41 -8 -57 -25z" fixlter="url(#glow)"/>
-	</g>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="1000pt" height="640pt"
+     viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet">
+  <!--
+    Badcoin Phoenix Core disk-image background.
+    Copyright (c) 2025 The Badcoin developers
+    Distributed under the MIT software license, see the accompanying
+    file COPYING or http://www.opensource.org/licenses/mit-license.php.
+    The DMG window is 500x320; this art is drawn at 2x (1000x640). The
+    application icon sits near (256,312) and the Applications folder near
+    (740,312) in these coordinates.
+  -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#FFF7EC"/>
+      <stop offset="1"   stop-color="#FFE4C6"/>
+    </linearGradient>
+    <radialGradient id="ember" cx="500" cy="470" r="470" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#FF8A3C" stop-opacity="0.50"/>
+      <stop offset="0.6" stop-color="#FFB155" stop-opacity="0.18"/>
+      <stop offset="1"   stop-color="#FFD9A0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#FFCE45"/>
+      <stop offset="0.5" stop-color="#F26C1E"/>
+      <stop offset="1"   stop-color="#D11F2A"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"   stop-color="#F4A646"/>
+      <stop offset="1"   stop-color="#E0561C"/>
+    </linearGradient>
+    <!-- a single flame tongue, base at 0,0, rising to about y=-162 -->
+    <path id="flametongue"
+      d="M 0,0
+         C -34,-14 -44,-66 -22,-110
+         C -15,-124 -19,-150 -4,-162
+         C -1,-146 13,-156 9,-132
+         C 27,-120 33,-70 16,-32
+         C 9,-17 13,-6 0,0 Z"
+      fill="url(#flame)"/>
+  </defs>
+
+  <!-- warm sky and a soft ember glow -->
+  <rect width="1000" height="640" fill="url(#sky)"/>
+  <rect width="1000" height="640" fill="url(#ember)"/>
+
+  <!-- flame clusters rising from the bottom corners -->
+  <g opacity="0.5">
+    <use xlink:href="#flametongue" transform="translate(80,660) scale(0.95)"/>
+    <use xlink:href="#flametongue" transform="translate(170,668) scale(1.18)"/>
+    <use xlink:href="#flametongue" transform="translate(258,658) scale(0.72)"/>
+  </g>
+  <g opacity="0.5">
+    <use xlink:href="#flametongue" transform="translate(742,658) scale(0.72)"/>
+    <use xlink:href="#flametongue" transform="translate(830,668) scale(1.18)"/>
+    <use xlink:href="#flametongue" transform="translate(920,660) scale(0.95)"/>
+  </g>
+
+  <!-- spark stars, echoing the rim of the coin -->
+  <g fill="#FFB23C">
+    <polygon points="118,150 122,164 136,168 122,172 118,186 114,172 100,168 114,164"/>
+    <polygon points="884,150 888,164 902,168 888,172 884,186 880,172 866,168 880,164"/>
+    <polygon points="508,236 512,248 524,252 512,256 508,268 504,256 492,252 504,248"/>
+    <polygon points="496,392 500,404 512,408 500,412 496,424 492,412 480,408 492,404"/>
+  </g>
+
+  <!-- title -->
+  <text x="500" y="108" text-anchor="middle"
+        font-family="Helvetica,Arial,sans-serif" font-size="50" font-weight="bold"
+        fill="#3C3A38">Badcoin <tspan fill="#C41C28">Phoenix</tspan> Core</text>
+
+  <!-- tagline -->
+  <text x="500" y="158" text-anchor="middle"
+        font-family="Helvetica,Arial,sans-serif" font-size="31"
+        font-weight="bold" font-style="italic"
+        fill="#E66018">We are back!</text>
+
+  <!-- drag arrow between the application icon and the Applications folder -->
+  <polygon points="404,300 556,300 556,282 612,312 556,342 556,324 404,324"
+           fill="url(#arrow)"/>
 </svg>
