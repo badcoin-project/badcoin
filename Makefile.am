@@ -25,9 +25,7 @@ empty :=
 space := $(empty) $(empty)
 
 OSX_APP=Badcoin-Qt.app
-# Disk-image volume name. Kept independent of PACKAGE_NAME so the installer
-# carries the Phoenix branding; must be a single shell token (no spaces).
-OSX_VOLNAME = Badcoin-Phoenix-Core
+OSX_VOLNAME = $(subst $(space),-,$(PACKAGE_NAME))
 OSX_DMG = $(OSX_VOLNAME).dmg
 OSX_BACKGROUND_SVG=background.svg
 OSX_BACKGROUND_IMAGE=background.tiff

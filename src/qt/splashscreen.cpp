@@ -24,47 +24,37 @@
 #include <QCloseEvent>
 #include <QDesktopWidget>
 #include <QKeyEvent>
-#include <QLinearGradient>
 #include <QPainter>
-#include <QPolygonF>
 #include <QRadialGradient>
 #include <boost/bind/bind.hpp>
 
 using namespace boost::placeholders;
 
-// Draw a small four-point "spark" star, used as a celebratory accent on the
-// Phoenix splash. cx, cy is the centre; r is the outer radius.
-static void drawSpark(QPainter &p, double cx, double cy, double r)
-{
-    static const double ux[8] = { 0.0, 0.2404, 1.0, 0.2404, 0.0, -0.2404, -1.0, -0.2404 };
-    static const double uy[8] = { -1.0, -0.2404, 0.0, 0.2404, 1.0, 0.2404, 0.0, -0.2404 };
-    QPolygonF star;
-    for (int i = 0; i < 8; ++i)
-        star << QPointF(cx + ux[i] * r, cy + uy[i] * r);
-    p.drawPolygon(star);
-}
-
 SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) :
     QWidget(0, f), curAlignment(0)
 {
+    // set reference point, paddings
+    int paddingRight            = 50;
+    int paddingTop              = 50;
+    int titleVersionVSpace      = 17;
+    int titleCopyrightVSpace    = 40;
+
+    float fontFactor            = 1.0;
     float devicePixelRatio      = 1.0;
 #if QT_VERSION > 0x050100
     devicePixelRatio = ((QGuiApplication*)QCoreApplication::instance())->devicePixelRatio();
 #endif
 
     // define text to place
-    QString titleText       = QStringLiteral("Badcoin Phoenix Core");
+    QString titleText       = tr(PACKAGE_NAME);
     QString versionText     = QString("Version %1").arg(QString::fromStdString(FormatFullVersion()));
     QString copyrightText   = QString::fromUtf8(CopyrightHolders(strprintf("\xc2\xA9 %u-%u ", 2009, COPYRIGHT_YEAR)).c_str());
     QString titleAddText    = networkStyle->getTitleAddText();
-    QString fontName        = QApplication::font().family();
 
-    // logical splash size
-    const int W = 520;
-    const int H = 340;
+    QString font            = QApplication::font().toString();
 
     // create a bitmap according to device pixelratio
-    QSize splashSize(W*devicePixelRatio, H*devicePixelRatio);
+    QSize splashSize(480*devicePixelRatio,320*devicePixelRatio);
     pixmap = QPixmap(splashSize);
 
 #if QT_VERSION > 0x050100
@@ -73,107 +63,64 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
 #endif
 
     QPainter pixPaint(&pixmap);
-    pixPaint.setRenderHint(QPainter::Antialiasing);
-    pixPaint.setRenderHint(QPainter::SmoothPixmapTransform);
+    pixPaint.setPen(QColor(100,100,100));
 
-    // -- warm background: a cream sky fading to white -----------------------
-    QLinearGradient bg(0, 0, 0, H);
-    bg.setColorAt(0.0, QColor(255, 246, 234));
-    bg.setColorAt(1.0, QColor(255, 255, 255));
-    pixPaint.fillRect(QRect(0, 0, W, H), bg);
+    // draw a slightly radial gradient
+    QRadialGradient gradient(QPoint(0,0), splashSize.width()/devicePixelRatio);
+    gradient.setColorAt(0, Qt::white);
+    gradient.setColorAt(1, QColor(247,247,247));
+    QRect rGradient(QPoint(0,0), splashSize);
+    pixPaint.fillRect(rGradient, gradient);
 
-    // a soft ember glow rising behind the phoenix
-    QRadialGradient glow(QPointF(140, 250), 280);
-    glow.setColorAt(0.0,  QColor(255, 138, 46, 105));
-    glow.setColorAt(0.55, QColor(255, 170, 80, 40));
-    glow.setColorAt(1.0,  QColor(255, 200, 130, 0));
-    pixPaint.fillRect(QRect(0, 0, W, H), glow);
+    // draw the bitcoin icon, expected size of PNG: 1024x1024
+    QRect rectIcon(QPoint(-150,-122), QSize(430,430));
 
-    // -- the phoenix mascot, front and centre on the left -------------------
-    {
-        QPixmap phoenix(":/icons/badcoin_phoenix_splash");
-        if (!phoenix.isNull()) {
-            const QRect box(6, 10, 246, 252);
-            QPixmap scaled = phoenix.scaled(box.width(), box.height(),
-                Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            pixPaint.drawPixmap(box.x() + (box.width()  - scaled.width())  / 2,
-                                box.y() + (box.height() - scaled.height()) / 2,
-                                scaled);
-        }
+    const QSize requiredSize(1024,1024);
+    QPixmap icon(networkStyle->getAppIcon().pixmap(requiredSize));
+
+    pixPaint.drawPixmap(rectIcon, icon);
+
+    // check font size and drawing with
+    pixPaint.setFont(QFont(font, 33*fontFactor));
+    QFontMetrics fm = pixPaint.fontMetrics();
+    int titleTextWidth = fm.width(titleText);
+    if (titleTextWidth > 176) {
+        fontFactor = fontFactor * 176 / titleTextWidth;
     }
 
-    // -- title block on the right -------------------------------------------
-    const int tx = 264;
+    pixPaint.setFont(QFont(font, 33*fontFactor));
+    fm = pixPaint.fontMetrics();
+    titleTextWidth  = fm.width(titleText);
+    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight,paddingTop,titleText);
 
-    {
-        QFont f(fontName, 21);
-        f.setBold(true);
-        pixPaint.setFont(f);
-        pixPaint.setPen(QColor(58, 58, 58));
-        pixPaint.drawText(tx, 56, QStringLiteral("Badcoin"));
+    pixPaint.setFont(QFont(font, 15*fontFactor));
+
+    // if the version string is to long, reduce size
+    fm = pixPaint.fontMetrics();
+    int versionTextWidth  = fm.width(versionText);
+    if(versionTextWidth > titleTextWidth+paddingRight-10) {
+        pixPaint.setFont(QFont(font, 10*fontFactor));
+        titleVersionVSpace -= 5;
     }
+    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight+2,paddingTop+titleVersionVSpace,versionText);
+
+    // draw copyright stuff
     {
-        QFont f(fontName, 33);
-        f.setBold(true);
-        f.setLetterSpacing(QFont::PercentageSpacing, 103);
-        pixPaint.setFont(f);
-        pixPaint.setPen(QColor(196, 28, 40));
-        pixPaint.drawText(tx, 100, QStringLiteral("PHOENIX"));
-    }
-    {
-        QFont f(fontName, 17);
-        f.setBold(true);
-        f.setLetterSpacing(QFont::PercentageSpacing, 180);
-        pixPaint.setFont(f);
-        pixPaint.setPen(QColor(140, 140, 140));
-        pixPaint.drawText(tx + 1, 126, QStringLiteral("CORE"));
+        pixPaint.setFont(QFont(font, 10*fontFactor));
+        const int x = pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight;
+        const int y = paddingTop+titleCopyrightVSpace;
+        QRect copyrightRect(x, y, pixmap.width() - x - paddingRight, pixmap.height() - y);
+        pixPaint.drawText(copyrightRect, Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, copyrightText);
     }
 
-    // a warm divider rule under the title
-    pixPaint.setPen(QPen(QColor(240, 150, 60), 2));
-    pixPaint.drawLine(tx + 1, 142, W - 36, 142);
-
-    // -- the "We are back!" tagline -----------------------------------------
-    {
-        QFont f(fontName, 17);
-        f.setBold(true);
-        f.setItalic(true);
-        pixPaint.setFont(f);
-        pixPaint.setPen(QColor(230, 96, 24));
-        pixPaint.drawText(tx + 1, 173, QStringLiteral("We are back!"));
-    }
-
-    // small spark accents, echoing the stars on the coin
-    pixPaint.setPen(Qt::NoPen);
-    pixPaint.setBrush(QColor(255, 190, 70));
-    drawSpark(pixPaint, W - 48, 162, 5.5);
-    drawSpark(pixPaint, W - 30, 180, 3.4);
-    drawSpark(pixPaint, W - 41, 198, 2.6);
-
-    // -- version and copyright, small and low -------------------------------
-    {
-        QFont f(fontName, 9);
-        pixPaint.setFont(f);
-        pixPaint.setPen(QColor(150, 150, 150));
-        pixPaint.drawText(tx + 1, 206, versionText);
-
-        QFont fc(fontName, 8);
-        pixPaint.setFont(fc);
-        pixPaint.setPen(QColor(170, 170, 170));
-        QRect copyrightRect(tx + 1, 214, W - tx - 1 - 14, 52);
-        pixPaint.drawText(copyrightRect,
-            Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap, copyrightText);
-    }
-
-    // -- network badge for testnet / regtest --------------------------------
-    if (!titleAddText.isEmpty()) {
-        QFont boldFont(fontName, 10);
-        boldFont.setBold(true);
+    // draw additional text if special network
+    if(!titleAddText.isEmpty()) {
+        QFont boldFont = QFont(font, 10*fontFactor);
+        boldFont.setWeight(QFont::Bold);
         pixPaint.setFont(boldFont);
-        QFontMetrics fm = pixPaint.fontMetrics();
-        int addWidth = fm.width(titleAddText);
-        pixPaint.setPen(QColor(196, 28, 40));
-        pixPaint.drawText(W - addWidth - 12, 16, titleAddText);
+        fm = pixPaint.fontMetrics();
+        int titleAddTextWidth  = fm.width(titleAddText);
+        pixPaint.drawText(pixmap.width()/devicePixelRatio-titleAddTextWidth-10,15,titleAddText);
     }
 
     pixPaint.end();
