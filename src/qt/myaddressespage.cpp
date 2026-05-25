@@ -17,10 +17,13 @@
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QClipboard>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QFont>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QStringList>
@@ -38,6 +41,7 @@ MyAddressesPage::MyAddressesPage(const PlatformStyle *_platformStyle, QWidget *p
     , copyButton(nullptr)
     , exportKeyButton(nullptr)
     , removeButton(nullptr)
+    , importButton(nullptr)
 {
     QVBoxLayout *layout = new QVBoxLayout(this);
 
@@ -74,17 +78,23 @@ MyAddressesPage::MyAddressesPage(const PlatformStyle *_platformStyle, QWidget *p
     copyButton      = new QPushButton(tr("Copy"));
     exportKeyButton = new QPushButton(tr("Export Private Key"));
     removeButton    = new QPushButton(tr("Remove"));
+    importButton    = new QPushButton(tr("Import Address"));
     buttonRow->addWidget(newButton);
     buttonRow->addWidget(copyButton);
     buttonRow->addWidget(exportKeyButton);
     buttonRow->addWidget(removeButton);
     buttonRow->addStretch();
+    // Import is the "bring in from outside" action; placed at the far right
+    // of the row, after a stretch, to set it apart from the existing
+    // manage-your-own-addresses buttons.
+    buttonRow->addWidget(importButton);
     layout->addLayout(buttonRow);
 
     connect(newButton,       SIGNAL(clicked()), this, SLOT(onNew()));
     connect(copyButton,      SIGNAL(clicked()), this, SLOT(onCopy()));
     connect(exportKeyButton, SIGNAL(clicked()), this, SLOT(onExportPrivateKey()));
     connect(removeButton,    SIGNAL(clicked()), this, SLOT(onRemove()));
+    connect(importButton,    SIGNAL(clicked()), this, SLOT(onImportAddress()));
     connect(table,           SIGNAL(itemSelectionChanged()), this, SLOT(updateButtons()));
     connect(table,           SIGNAL(itemChanged(QTableWidgetItem*)),
             this,            SLOT(onItemChanged(QTableWidgetItem*)));
@@ -339,4 +349,105 @@ void MyAddressesPage::onRemove()
         return;
     }
     refresh();
+}
+
+void MyAddressesPage::onImportAddress()
+{
+    if (!walletModel)
+        return;
+
+    // Build a small modal dialog inline. Two fields (WIF + optional label),
+    // a plain-language note about what import does, and Cancel / Import
+    // buttons. No rescan from the GUI thread: a full rescan can take many
+    // minutes and would freeze the UI. We tell the user how to trigger one
+    // afterward instead.
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Import Address"));
+    dlg.setModal(true);
+
+    QVBoxLayout *dlgLayout = new QVBoxLayout(&dlg);
+
+    QLabel *note = new QLabel(tr(
+        "Paste the private key (WIF) for an address you want this wallet to "
+        "control. Importing a private key gives this wallet full control of "
+        "the corresponding address. Only import keys you trust the source of."),
+        &dlg);
+    note->setWordWrap(true);
+    dlgLayout->addWidget(note);
+
+    QLabel *keyLabel = new QLabel(tr("Private key (WIF):"), &dlg);
+    dlgLayout->addWidget(keyLabel);
+    QLineEdit *keyEdit = new QLineEdit(&dlg);
+    keyEdit->setEchoMode(QLineEdit::Normal);
+    QFont mono = keyEdit->font();
+    mono.setStyleHint(QFont::TypeWriter);
+    mono.setFamily(QStringLiteral("Monospace"));
+    keyEdit->setFont(mono);
+    keyEdit->setPlaceholderText(tr("e.g. a Badcoin WIF beginning with a capital letter"));
+    dlgLayout->addWidget(keyEdit);
+
+    QLabel *labelLabel = new QLabel(tr("Address label (optional):"), &dlg);
+    dlgLayout->addWidget(labelLabel);
+    QLineEdit *labelEdit = new QLineEdit(&dlg);
+    labelEdit->setPlaceholderText(tr("Imported address"));
+    dlgLayout->addWidget(labelEdit);
+
+    QLabel *rescanNote = new QLabel(tr(
+        "After import, this address's past transactions will not show until "
+        "you restart with -rescan or run `rescanblockchain` in the debug "
+        "console. Future transactions are picked up immediately."), &dlg);
+    rescanNote->setWordWrap(true);
+    dlgLayout->addWidget(rescanNote);
+
+    QDialogButtonBox *buttons = new QDialogButtonBox(
+        QDialogButtonBox::Cancel, Qt::Horizontal, &dlg);
+    QPushButton *importBtn = buttons->addButton(tr("Import"), QDialogButtonBox::AcceptRole);
+    importBtn->setDefault(true);
+    dlgLayout->addWidget(buttons);
+
+    connect(buttons, SIGNAL(accepted()), &dlg, SLOT(accept()));
+    connect(buttons, SIGNAL(rejected()), &dlg, SLOT(reject()));
+
+    keyEdit->setFocus();
+
+    if (dlg.exec() != QDialog::Accepted)
+        return;
+
+    const QString wif   = keyEdit->text().trimmed();
+    const QString label = labelEdit->text().trimmed();
+    if (wif.isEmpty()) {
+        QMessageBox::warning(this, tr("Import address"),
+            tr("Please enter a private key."));
+        return;
+    }
+
+    // Importing writes a new key into the wallet, so an encrypted wallet
+    // must be unlocked first. Same pattern as onNew().
+    WalletModel::UnlockContext ctx(walletModel->requestUnlock());
+    if (!ctx.isValid())
+        return;
+
+    bool alreadyHad = false;
+    QString errorOut;
+    if (!walletModel->importPrivateKey(wif, label, alreadyHad, errorOut)) {
+        QMessageBox::warning(this, tr("Import failed"),
+            errorOut.isEmpty() ? tr("The address could not be imported.")
+                               : errorOut);
+        return;
+    }
+
+    refresh();
+
+    if (alreadyHad) {
+        QMessageBox::information(this, tr("Address already in wallet"),
+            tr("The wallet already held this private key. The label has been "
+               "updated on the My Addresses tab."));
+    } else {
+        QMessageBox::information(this, tr("Address imported"),
+            tr("The address has been added to the wallet.\n\n"
+               "To pick up any past transactions for this address, restart "
+               "badcoin-qt with `-rescan`, or run `rescanblockchain` in the "
+               "debug console (Help > Debug window > Console). Future "
+               "transactions are picked up automatically."));
+    }
 }

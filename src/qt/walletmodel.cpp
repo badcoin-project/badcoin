@@ -724,6 +724,62 @@ bool WalletModel::importVanityAddress(const QString &wif, const QString &label, 
     return true;
 }
 
+bool WalletModel::importPrivateKey(const QString &wif, const QString &label,
+                                   bool &alreadyHad, QString &errorOut)
+{
+    alreadyHad = false;
+
+    // Decode the wallet-import-format string.
+    CBitcoinSecret secret;
+    if (!secret.SetString(wif.toStdString())) {
+        errorOut = tr("The private key could not be decoded. Make sure it is a "
+                      "valid Badcoin WIF.");
+        return false;
+    }
+    CKey key = secret.GetKey();
+    if (!key.IsValid()) {
+        errorOut = tr("The private key is outside the allowed range.");
+        return false;
+    }
+    CPubKey pubkey = key.GetPubKey();
+    if (!key.VerifyPubKey(pubkey)) {
+        errorOut = tr("The private key and its public key do not match.");
+        return false;
+    }
+    const CKeyID keyID = pubkey.GetID();
+
+    // Label the destination of the wallet's default address type so the
+    // imported key shows up on My Addresses under the same address format
+    // the wallet uses everywhere else (P2SH-segwit "B..." by default).
+    OutputType addrType = (g_address_type == OUTPUT_TYPE_NONE)
+        ? OUTPUT_TYPE_P2SH_SEGWIT : g_address_type;
+    const CTxDestination dest = GetDestinationForKey(pubkey, addrType);
+
+    LOCK2(cs_main, wallet->cs_wallet);
+    wallet->MarkDirty();
+    // Always (re)label the address, so re-importing a key updates the name
+    // on the My Addresses tab even if the wallet already holds the key.
+    wallet->SetAddressBook(dest, label.toStdString(), "receive");
+
+    if (wallet->HaveKey(keyID)) {
+        alreadyHad = true;
+        return true;
+    }
+
+    // Birthday = 1 so a future `-rescan` startup or `rescanblockchain`
+    // console call will scan back to genesis for this key's history.
+    // (We deliberately do NOT call RescanFromTime here: a 1.8M-block
+    // rescan from the GUI thread would freeze the UI for many minutes.)
+    wallet->mapKeyMetadata[keyID].nCreateTime = 1;
+
+    if (!wallet->AddKeyPubKey(key, pubkey)) {
+        errorOut = tr("The key could not be added to the wallet.");
+        return false;
+    }
+    wallet->LearnAllRelatedScripts(pubkey);
+    return true;
+}
+
 WalletModel::ImmatureMaturity WalletModel::getImmatureMaturity() const
 {
     // Walk the wallet's coinbase transactions that have not yet matured and

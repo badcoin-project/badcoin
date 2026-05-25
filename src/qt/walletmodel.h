@@ -218,6 +218,18 @@ public:
     // errorOut on failure.
     bool importVanityAddress(const QString &wif, const QString &label, QString &errorOut);
 
+    // Import a private key (wallet-import format) from outside the wallet
+    // and label it. Used by the "Import Address" button on the My Addresses
+    // page. The key's birthday is set to 1 (genesis-equivalent) so a future
+    // `-rescan` startup or `rescanblockchain` console call will pick up its
+    // history; no rescan is performed here (the GUI thread cannot block on
+    // a multi-minute rescan without freezing the UI). The caller is expected
+    // to surface that to the user. `alreadyHad` is set to true when the
+    // wallet already held the key (the call still re-labels the address).
+    // Returns false with a human-readable reason in errorOut on failure.
+    bool importPrivateKey(const QString &wif, const QString &label,
+                          bool &alreadyHad, QString &errorOut);
+
     // Coinbase maturity summary for the Overview "Coin Maturity" panel.
     struct ImmatureMaturity {
         int     count = 0;          // immature coinbase transactions

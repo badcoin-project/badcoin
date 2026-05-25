@@ -30,6 +30,9 @@ QT_END_NAMESPACE
  *                        reveal, which also offers the Save-as-PDF paper wallet.
  *   Remove             - clear the selected address's label. An HD wallet
  *                        cannot delete a key, so Remove resets the label only.
+ *   Import Address     - bring in an external private key (WIF) so the wallet
+ *                        controls the corresponding address. Shown at the
+ *                        right of the row to mark it as the "incoming" action.
  */
 class MyAddressesPage : public QWidget
 {
@@ -48,6 +51,7 @@ private Q_SLOTS:
     void onCopy();
     void onExportPrivateKey();
     void onRemove();
+    void onImportAddress();
     void onItemChanged(QTableWidgetItem *item);
     void updateButtons();
 
@@ -69,6 +73,7 @@ private:
     QPushButton *copyButton;
     QPushButton *exportKeyButton;
     QPushButton *removeButton;
+    QPushButton *importButton;
 };
 
 #endif // BITCOIN_QT_MYADDRESSESPAGE_H
