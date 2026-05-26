@@ -31,6 +31,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSet>
 #include <QStringList>
 #include <QTableWidget>
@@ -38,6 +39,7 @@
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QWidget>
 
 // The Base58 alphabet Bitcoin and Badcoin use. It deliberately leaves out the
 // four look-alike characters 0 (zero), O (capital o), I (capital i) and
@@ -197,25 +199,67 @@ VanityAddressPage::VanityAddressPage(const PlatformStyle *_platformStyle, QWidge
     prefixHint->setWordWrap(true);
     inputLayout->addWidget(prefixHint);
 
+    // Prefix editor + Expand/Collapse toggle on the same row.
+    // Default editor height fits ~3 lines (90px). The toggle button bumps
+    // it to ~12 lines (250px) when the user is entering long prefix lists
+    // (100+ entries) and back to the compact height when they want to see
+    // the rest of the page. The validation messages below are wrapped in a
+    // fixed-height scroll area (next block), so no matter how many prefixes
+    // the user enters the Search button below stays in view.
+    QHBoxLayout *editorRow = new QHBoxLayout();
     prefixEdit = new QPlainTextEdit();
     prefixEdit->setPlaceholderText(tr("BAD\nBEST"));
     prefixEdit->setMaximumHeight(90);
-    inputLayout->addWidget(prefixEdit);
+    editorRow->addWidget(prefixEdit, 1);
+
+    QPushButton *expandToggle = new QPushButton(tr("Expand"));
+    expandToggle->setCheckable(true);
+    expandToggle->setToolTip(tr(
+        "Make the prefix editor taller so you can see more lines at once. "
+        "Useful when entering large batches of prefixes."));
+    expandToggle->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    editorRow->addWidget(expandToggle, 0, Qt::AlignTop);
+    connect(expandToggle, &QPushButton::toggled, this,
+            [this, expandToggle](bool on) {
+                prefixEdit->setMaximumHeight(on ? 250 : 90);
+                expandToggle->setText(on ? tr("Collapse") : tr("Expand"));
+            });
+    inputLayout->addLayout(editorRow);
+
+    // Validation feedback panel.
+    // The three labels can each grow to one line per active prefix, which at
+    // 100+ prefixes is enough to push the Search button below the viewport.
+    // Hosting them inside a QScrollArea with a fixed maximum height keeps the
+    // whole page above the Search button bounded, no matter how many prefixes
+    // the user enters. The user can still scroll the feedback to read it.
+    QScrollArea *feedbackScroll = new QScrollArea();
+    feedbackScroll->setFrameShape(QFrame::NoFrame);
+    feedbackScroll->setWidgetResizable(true);
+    feedbackScroll->setMaximumHeight(140);
+    feedbackScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    QWidget *feedbackContainer = new QWidget();
+    QVBoxLayout *feedbackLayout = new QVBoxLayout(feedbackContainer);
+    feedbackLayout->setContentsMargins(0, 0, 0, 0);
 
     checkLabel = new QLabel();
     checkLabel->setWordWrap(true);
     checkLabel->setTextFormat(Qt::PlainText);
-    inputLayout->addWidget(checkLabel);
+    feedbackLayout->addWidget(checkLabel);
 
     difficultyLabel = new QLabel();
     difficultyLabel->setWordWrap(true);
     difficultyLabel->setTextFormat(Qt::PlainText);
-    inputLayout->addWidget(difficultyLabel);
+    feedbackLayout->addWidget(difficultyLabel);
 
     guidanceLabel = new QLabel();
     guidanceLabel->setWordWrap(true);
     guidanceLabel->setTextFormat(Qt::PlainText);
-    inputLayout->addWidget(guidanceLabel);
+    feedbackLayout->addWidget(guidanceLabel);
+
+    feedbackLayout->addStretch();
+    feedbackScroll->setWidget(feedbackContainer);
+    inputLayout->addWidget(feedbackScroll);
 
     layout->addWidget(inputBox);
 
