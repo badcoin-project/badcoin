@@ -6,6 +6,8 @@
 
 #include <validation.h>
 
+#include <pixies/pixie_index.h>
+
 #include <arith_uint256.h>
 #include <auxpow.h>
 #include <chain.h>
@@ -952,6 +954,13 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
             }
         }
 
+        if (chainActive.Tip() && pixies::CPixieIndex::Instance().IsActive(chainActive.Height() + 1)) {
+            pixies::PixieRejectCode pixie_reject;
+            if (!pixies::CPixieIndex::Instance().CheckPixieTx(tx, chainActive.Height() + 1, pixie_reject)) {
+                return state.DoS(0, false, REJECT_INVALID, pixies::PixieRejectCodeString(pixie_reject));
+            }
+        }
+
         // Remove conflicting transactions from the mempool
         for (const CTxMemPool::txiter it : allConflicting)
         {
@@ -1726,6 +1735,11 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
     // move best block pointer to prevout block
     view.SetBestBlock(pindex->pprev->GetBlockHash());
 
+    pixies::CPixieIndex::Instance().DisconnectBlock(pindex->nHeight, &Params());
+    if (pindex->pprev) {
+        pixies::CPixieIndex::Instance().FlushToDisk(pindex->pprev->GetBlockHash());
+    }
+
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
@@ -2132,6 +2146,14 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
 
     int64_t nTime6 = GetTimeMicros(); nTimeCallbacks += nTime6 - nTime5;
     LogPrint(BCLog::BENCH, "    - Callbacks: %.2fms [%.2fs (%.2fms/blk)]\n", MILLI * (nTime6 - nTime5), nTimeCallbacks * MICRO, nTimeCallbacks * MILLI / nBlocksTotal);
+
+    pixies::PixieRejectCode pixie_reject;
+    if (!pixies::CPixieIndex::Instance().ConnectBlock(block.vtx, pindex->nHeight, pixie_reject)) {
+        return state.DoS(100, error("ConnectBlock(): BadPixies tx invalid (%s)",
+                                    pixies::PixieRejectCodeString(pixie_reject).c_str()),
+                         REJECT_INVALID, pixies::PixieRejectCodeString(pixie_reject));
+    }
+    pixies::CPixieIndex::Instance().FlushToDisk(pindex->GetBlockHash());
 
     return true;
 }

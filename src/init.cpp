@@ -22,6 +22,8 @@
 #include <httprpc.h>
 #include <key.h>
 #include <validation.h>
+
+#include <pixies/pixie_index.h>
 #include <miner.h>
 #include <netbase.h>
 #include <net.h>
@@ -494,6 +496,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-bytespersigop", strprintf(_("Equivalent bytes per sigop in transactions for relay and mining (default: %u)"), DEFAULT_BYTES_PER_SIGOP));
     strUsage += HelpMessageOpt("-datacarrier", strprintf(_("Relay and mine data carrier transactions (default: %u)"), DEFAULT_ACCEPT_DATACARRIER));
     strUsage += HelpMessageOpt("-datacarriersize", strprintf(_("Maximum size of data in data carrier transactions we relay and mine (default: %u)"), MAX_OP_RETURN_RELAY));
+    strUsage += HelpMessageOpt("-reindex-pixies", _("Rebuild the BadPixies index from the blockchain"));
+    strUsage += HelpMessageOpt("-pixiesactivationheight", _("Block height at which BadPixies rules are enforced (default: 0)"));
     strUsage += HelpMessageOpt("-mempoolreplacement", strprintf(_("Enable transaction replacement in the memory pool (default: %u)"), DEFAULT_ENABLE_REPLACEMENT));
     strUsage += HelpMessageOpt("-minrelaytxfee=<amt>", strprintf(_("Fees (in %s/kB) smaller than this are considered zero fee for relaying, mining and transaction creation (default: %s)"),
         CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)));
@@ -692,6 +696,11 @@ void ThreadImport(std::vector<fs::path> vImportFiles)
         StartShutdown();
         return;
     }
+
+    pixies::InitPixieIndex(chainparams,
+        gArgs.GetBoolArg("-reindex-pixies", false) || gArgs.GetBoolArg("-reindex-chainstate", false));
+    pixies::FinalizePixieIndexAfterBlockImport(chainparams,
+        gArgs.GetBoolArg("-reindex-pixies", false) || gArgs.GetBoolArg("-reindex-chainstate", false));
 
     if (gArgs.GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT)) {
         LogPrintf("Stopping after block import\n");
@@ -1103,6 +1112,9 @@ bool AppInitParameterInteraction()
     fIsBareMultisigStd = gArgs.GetBoolArg("-permitbaremultisig", DEFAULT_PERMIT_BAREMULTISIG);
     fAcceptDatacarrier = gArgs.GetBoolArg("-datacarrier", DEFAULT_ACCEPT_DATACARRIER);
     nMaxDatacarrierBytes = gArgs.GetArg("-datacarriersize", nMaxDatacarrierBytes);
+
+    pixies::CPixieIndex::Instance().SetActivationHeight(
+        gArgs.GetArg("-pixiesactivationheight", 0));
 
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(gArgs.GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
@@ -1552,6 +1564,11 @@ bool AppInitMain()
                         strLoadError = _("Unable to rewind the database to a pre-fork state. You will need to redownload the blockchain");
                         break;
                     }
+                }
+
+                if (!is_coinsview_empty) {
+                    pixies::InitPixieIndex(chainparams,
+                        gArgs.GetBoolArg("-reindex-pixies", false) || fReindexChainState);
                 }
 
                 if (!is_coinsview_empty) {

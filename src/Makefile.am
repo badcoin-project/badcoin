@@ -123,6 +123,9 @@ BITCOIN_CORE_H = \
   policy/fees.h \
   policy/policy.h \
   policy/rbf.h \
+  pixies/pixie_db.h \
+  pixies/pixie_index.h \
+  pixies/pixies.h \
   pow.h \
   protocol.h \
   random.h \
@@ -210,11 +213,15 @@ libbitcoin_server_a_SOURCES = \
   policy/policy.cpp \
   policy/rbf.cpp \
   pow.cpp \
+  pixies/pixies.cpp \
+  pixies/pixie_db.cpp \
+  pixies/pixie_index.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
   rpc/net.cpp \
+  rpc/pixies.cpp \
   rpc/rawtransaction.cpp \
   rpc/safemode.cpp \
   rpc/server.cpp \
