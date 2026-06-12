@@ -1,0 +1,114 @@
+name: Windows artifact build
+
+"on":
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - ci/windows-artifact-build
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-build:
+    name: Windows x64 ${{ matrix.variant }}
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: core
+            depends_extra: "NO_QT=1"
+            configure_extra: "--without-gui"
+            expected_qt: "false"
+          - variant: qt
+            depends_extra: ""
+            configure_extra: "--with-gui=qt5"
+            expected_qt: "true"
+
+    env:
+      HOST: x86_64-w64-mingw32
+      MAKEJOBS: "-j2"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libtool \
+            autotools-dev \
+            automake \
+            pkg-config \
+            bsdmainutils \
+            curl \
+            ca-certificates \
+            git \
+            python3 \
+            g++-mingw-w64-x86-64 \
+            mingw-w64-x86-64-dev
+
+      - name: Select POSIX mingw-w64 toolchain
+        run: |
+          set -eux
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+
+      - name: Build depends
+        run: |
+          set -eux
+          make -C depends HOST="${HOST}" ${MAKEJOBS} ${{ matrix.depends_extra }}
+
+      - name: Configure
+        run: |
+          set -eux
+          ./autogen.sh
+          CONFIG_SITE="$PWD/depends/${HOST}/share/config.site" ./configure \
+            --prefix=/ \
+            --disable-ccache \
+            --disable-maintainer-mode \
+            --disable-dependency-tracking \
+            --disable-tests \
+            --disable-bench \
+            ${{ matrix.configure_extra }}
+
+      - name: Build
+        run: |
+          set -eux
+          make ${MAKEJOBS}
+
+      - name: Stage Windows artifacts
+        run: |
+          set -eux
+          mkdir -p "artifacts/windows-x64-${{ matrix.variant }}"
+
+          cp -v "src/badcoind.exe" "artifacts/windows-x64-${{ matrix.variant }}/"
+          cp -v "src/badcoin-cli.exe" "artifacts/windows-x64-${{ matrix.variant }}/"
+          cp -v "src/badcoin-tx.exe" "artifacts/windows-x64-${{ matrix.variant }}/"
+
+          if [ "${{ matrix.expected_qt }}" = "true" ]; then
+            cp -v "src/qt/badcoin-qt.exe" "artifacts/windows-x64-${{ matrix.variant }}/"
+          fi
+
+          cd "artifacts/windows-x64-${{ matrix.variant }}"
+          sha256sum *.exe > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: badcoin-windows-x64-${{ matrix.variant }}
+          path: artifacts/windows-x64-${{ matrix.variant }}/
+          if-no-files-found: error
