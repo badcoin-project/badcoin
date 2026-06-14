@@ -5,7 +5,7 @@ name: Windows artifact build
   pull_request:
   push:
     branches:
-      - ci/windows-artifact-build
+      - development
 
 permissions:
   contents: read
@@ -107,8 +107,9 @@ jobs:
           cat SHA256SUMS.txt
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: badcoin-windows-x64-${{ matrix.variant }}
           path: artifacts/windows-x64-${{ matrix.variant }}/
           if-no-files-found: error
+          retention-days: 14
