@@ -6,6 +6,7 @@ name: Windows artifact build
   push:
     branches:
       - development
+      - main
 
 permissions:
   contents: read
