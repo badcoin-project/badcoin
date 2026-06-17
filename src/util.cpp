@@ -954,8 +954,8 @@ std::string CopyrightHolders(const std::string& strPrefix)
     }
 
     // Check for untranslated substitution to make sure Myraid Core copyright is not removed by accident
-    if (strprintf(COPYRIGHT_HOLDERS, COPYRIGHT_HOLDERS_SUBSTITUTION).find("Myraid Core") == std::string::npos) {
-        strCopyrightHolders += "\n" + strPrefix + "The Myraid Core developers";
+    if (strprintf(COPYRIGHT_HOLDERS, COPYRIGHT_HOLDERS_SUBSTITUTION).find("Myriad Core") == std::string::npos) {
+        strCopyrightHolders += "\n" + strPrefix + "The Myriad Core developers";
     }
     return strCopyrightHolders;
 }
