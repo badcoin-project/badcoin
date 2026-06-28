@@ -1,0 +1,92 @@
+name: Linux artifact build
+
+"on":
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - development
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-build:
+    name: Linux x64 core
+    runs-on: ubuntu-22.04
+
+    env:
+      HOST: x86_64-pc-linux-gnu
+      MAKEJOBS: "-j2"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libtool \
+            autotools-dev \
+            automake \
+            pkg-config \
+            bsdmainutils \
+            curl \
+            ca-certificates \
+            git \
+            python3 \
+            cmake
+
+      - name: Build depends
+        run: |
+          set -eux
+          make -C depends HOST="${HOST}" ${MAKEJOBS} NO_QT=1
+
+      - name: Configure
+        run: |
+          set -eux
+          ./autogen.sh
+          CONFIG_SITE="$PWD/depends/${HOST}/share/config.site" ./configure \
+            --prefix=/ \
+            --disable-ccache \
+            --disable-maintainer-mode \
+            --disable-dependency-tracking \
+            --disable-tests \
+            --disable-bench \
+            --without-gui
+
+      - name: Build
+        run: |
+          set -eux
+          make ${MAKEJOBS}
+
+      - name: Stage Linux artifacts
+        run: |
+          set -eux
+          mkdir -p artifacts/linux-x64-core
+
+          cp -v src/badcoind artifacts/linux-x64-core/
+          cp -v src/badcoin-cli artifacts/linux-x64-core/
+          cp -v src/badcoin-tx artifacts/linux-x64-core/
+
+          cd artifacts/linux-x64-core
+          sha256sum badcoind badcoin-cli badcoin-tx > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-linux-x64-core
+          path: artifacts/linux-x64-core/
+          if-no-files-found: error
+          retention-days: 14

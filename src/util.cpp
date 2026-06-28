@@ -953,9 +953,14 @@ std::string CopyrightHolders(const std::string& strPrefix)
         strCopyrightHolders += "\n" + strPrefix + "The Bitcoin Core developers";
     }
 
-    // Check for untranslated substitution to make sure Myraid Core copyright is not removed by accident
-    if (strprintf(COPYRIGHT_HOLDERS, COPYRIGHT_HOLDERS_SUBSTITUTION).find("Myraid Core") == std::string::npos) {
-        strCopyrightHolders += "\n" + strPrefix + "The Myraid Core developers";
+    // Check for untranslated substitution to make sure Myriad Core copyright is not removed by accident
+    if (strprintf(COPYRIGHT_HOLDERS, COPYRIGHT_HOLDERS_SUBSTITUTION).find("Myriad Core") == std::string::npos) {
+        strCopyrightHolders += "\n" + strPrefix + "The Myriad Core developers";
+    }
+
+    // Check for untranslated substitution to make sure Badcoin Core copyright is not removed by accident
+    if (strprintf(COPYRIGHT_HOLDERS, COPYRIGHT_HOLDERS_SUBSTITUTION).find("Badcoin Core") == std::string::npos) {
+        strCopyrightHolders += "\n" + strPrefix + "The Badcoin Core developers";
     }
     return strCopyrightHolders;
 }
