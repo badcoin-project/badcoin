@@ -13,6 +13,7 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QSizePolicy>
 
 SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *parent) :
     QStackedWidget(parent),
@@ -30,10 +31,18 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
 
     setCurrentWidget(ui->SendCoins);
 
+    // Note used to be URI-only and hidden in clear(); keep it always visible and
+    // tall enough that the Send scroll area does not clip it under Amount.
+    ui->messageLabel->show();
+    ui->messageTextLabel->show();
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+    setMinimumHeight(qMax(220, sizeHint().height()));
+
     if (platformStyle->getUseExtraSpacing())
         ui->payToLayout->setSpacing(4);
 #if QT_VERSION >= 0x040700
     ui->addAsLabel->setPlaceholderText(tr("Enter a label for this address to add it to your address book"));
+    ui->messageTextLabel->setPlaceholderText(tr("Optional note (public on-chain, max 80 bytes)"));
 #endif
 
     // normal bitcoin address field
