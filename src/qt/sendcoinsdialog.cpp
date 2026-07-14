@@ -13,6 +13,9 @@
 #include <qt/optionsmodel.h>
 #include <qt/platformstyle.h>
 #include <qt/sendcoinsentry.h>
+#include <qt/transactionfilterproxy.h>
+#include <qt/transactionrecord.h>
+#include <qt/transactiontablemodel.h>
 
 #include <base58.h>
 #include <chainparams.h>
@@ -23,10 +26,15 @@
 #include <policy/fees.h>
 #include <wallet/fees.h>
 
+#include <QAbstractItemView>
 #include <QFontMetrics>
+#include <QHeaderView>
 #include <QScrollBar>
 #include <QSettings>
+#include <QTableView>
 #include <QTextDocument>
+
+static const int SENT_HISTORY_LIMIT = 10;
 
 static const std::array<int, 9> confTargets = { {2, 4, 6, 12, 24, 48, 144, 504, 1008} };
 int getConfTargetForIndex(int index) {
@@ -196,7 +204,46 @@ void SendCoinsDialog::setModel(WalletModel *_model)
             ui->confTargetSelector->setCurrentIndex(getIndexForConfTarget(model->getDefaultConfirmTarget()));
         else
             ui->confTargetSelector->setCurrentIndex(getIndexForConfTarget(settings.value("nConfTarget").toInt()));
+
+        setupSentHistoryView();
     }
+}
+
+void SendCoinsDialog::setupSentHistoryView()
+{
+    if (!model || !model->getTransactionTableModel() || !ui->sentHistoryView)
+        return;
+
+    sentHistoryFilter.reset(new TransactionFilterProxy());
+    sentHistoryFilter->setSourceModel(model->getTransactionTableModel());
+    sentHistoryFilter->setTypeFilter(
+        TransactionFilterProxy::TYPE(TransactionRecord::SendToAddress) |
+        TransactionFilterProxy::TYPE(TransactionRecord::SendToOther));
+    sentHistoryFilter->setLimit(SENT_HISTORY_LIMIT);
+    sentHistoryFilter->setShowInactive(false);
+    sentHistoryFilter->setDynamicSortFilter(true);
+    sentHistoryFilter->setSortRole(Qt::EditRole);
+    sentHistoryFilter->sort(TransactionTableModel::Date, Qt::DescendingOrder);
+
+    QTableView *view = ui->sentHistoryView;
+    view->setModel(sentHistoryFilter.get());
+    view->verticalHeader()->hide();
+    view->setAlternatingRowColors(true);
+    view->setSelectionBehavior(QAbstractItemView::SelectRows);
+    view->setSelectionMode(QAbstractItemView::SingleSelection);
+    view->setShowGrid(false);
+    view->setSortingEnabled(true);
+    view->horizontalHeader()->setHighlightSections(false);
+    view->horizontalHeader()->setStretchLastSection(true);
+
+    // Compact columns: Status | Date | To | Amount (hide Watchonly + Type)
+    view->setColumnHidden(TransactionTableModel::Watchonly, true);
+    view->setColumnHidden(TransactionTableModel::Type, true);
+    view->setColumnWidth(TransactionTableModel::Status, 40);
+    view->setColumnWidth(TransactionTableModel::Date, 120);
+    view->setColumnWidth(TransactionTableModel::ToAddress, 320);
+    view->horizontalHeader()->setSectionResizeMode(TransactionTableModel::ToAddress, QHeaderView::Stretch);
+    view->horizontalHeader()->setSectionResizeMode(TransactionTableModel::Amount, QHeaderView::ResizeToContents);
 }
 
 SendCoinsDialog::~SendCoinsDialog()

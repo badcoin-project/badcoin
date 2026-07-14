@@ -365,8 +365,7 @@ bool CPixieIndex::ValidateMint(const CTransaction& tx, int height, const PixieMi
 
     const uint32_t new_id = global.next_pixie_id;
     const CAmount burn_expected = ExpectedMintBurnSats(new_id);
-    const bool founding = (burn_expected == 0);
-    if (!FindMintBurnOutput(tx, burn_expected, founding)) {
+    if (!FindMintBurnOutput(tx, burn_expected, false)) {
         reject = PixieRejectCode::BURN;
         return false;
     }
@@ -536,8 +535,11 @@ void CPixieIndex::DisconnectBlock(int height, const CChainParams* params)
     }
 
     if (!have_undo) {
-        LogPrintf("Pixie index: missing undo at height %d, rebuilding to %d\n", height, height - 1);
-        ReindexToHeight(*params, height - 1);
+        // Do not call ReindexToHeight here. VerifyDB disconnects tip blocks
+        // without pixie undos present; a full reindex rehashes the chain and
+        // freezes startup at "Verifying blocks… 1%". Skip and let a later
+        // ConnectBlock / Load path rebuild the index if needed.
+        LogPrintf("Pixie index: missing undo at height %d, skipping disconnect (no reindex)\n", height);
         return;
     }
 

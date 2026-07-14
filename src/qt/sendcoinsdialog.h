@@ -12,10 +12,13 @@
 #include <QString>
 #include <QTimer>
 
+#include <memory>
+
 class ClientModel;
 class PlatformStyle;
 class SendCoinsEntry;
 class SendCoinsRecipient;
+class TransactionFilterProxy;
 
 namespace Ui {
     class SendCoinsDialog;
@@ -61,6 +64,7 @@ private:
     bool fNewRecipientAllowed;
     bool fFeeMinimized;
     const PlatformStyle *platformStyle;
+    std::unique_ptr<TransactionFilterProxy> sentHistoryFilter;
 
     // Process WalletModel::SendCoinsReturn and generate a pair consisting
     // of a message and message flags for use in Q_EMIT message().
@@ -70,6 +74,7 @@ private:
     void updateFeeMinimizedLabel();
     // Update the passed in CCoinControl with state from the GUI
     void updateCoinControlState(CCoinControl& ctrl);
+    void setupSentHistoryView();
 
 private Q_SLOTS:
     void on_sendButton_clicked();
