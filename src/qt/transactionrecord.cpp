@@ -6,6 +6,7 @@
 
 #include <base58.h>
 #include <consensus/consensus.h>
+#include <script/script.h>
 #include <validation.h>
 #include <timedata.h>
 #include <wallet/wallet.h>
@@ -20,6 +21,38 @@ bool TransactionRecord::showTransaction(const CWalletTx &wtx)
     // There are currently no cases where we hide transactions, but
     // we may want to use this in the future for things like RBF.
     return true;
+}
+
+/** Prefer wallet Message / mapValue, else first OP_RETURN push as UTF-8. */
+static QString ExtractTxNote(const CWalletTx &wtx)
+{
+    for (const std::pair<std::string, std::string>& r : wtx.vOrderForm) {
+        if (r.first == "Message" && !r.second.empty())
+            return QString::fromStdString(r.second);
+    }
+    if (wtx.mapValue.count("message") && !wtx.mapValue.at("message").empty())
+        return QString::fromStdString(wtx.mapValue.at("message"));
+    if (wtx.mapValue.count("comment") && !wtx.mapValue.at("comment").empty())
+        return QString::fromStdString(wtx.mapValue.at("comment"));
+
+    if (!wtx.tx)
+        return QString();
+    for (const CTxOut& out : wtx.tx->vout) {
+        if (!out.scriptPubKey.IsUnspendable())
+            continue;
+        opcodetype opcode;
+        std::vector<unsigned char> data;
+        CScript::const_iterator pc = out.scriptPubKey.begin();
+        if (!out.scriptPubKey.GetOp(pc, opcode) || opcode != OP_RETURN)
+            continue;
+        if (!out.scriptPubKey.GetOp(pc, opcode, data) || data.empty())
+            continue;
+        QString note = QString::fromUtf8(reinterpret_cast<const char*>(data.data()),
+                                         static_cast<int>(data.size()));
+        if (!note.trimmed().isEmpty())
+            return note.trimmed();
+    }
+    return QString();
 }
 
 /*
@@ -87,6 +120,10 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         isminetype fAllToMe = ISMINE_SPENDABLE;
         for (const CTxOut& txout : wtx.tx->vout)
         {
+            // OP_RETURN / unspendable outs (e.g. on-chain Note) are not "mine",
+            // but must not turn a payment-to-self into a different type.
+            if (txout.scriptPubKey.IsUnspendable())
+                continue;
             isminetype mine = wallet->IsMine(txout);
             if(mine & ISMINE_WATCH_ONLY) involvesWatchAddress = true;
             if(fAllToMe > mine) fAllToMe = mine;
@@ -122,6 +159,10 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     continue;
                 }
 
+                // Skip on-chain note (OP_RETURN); fee is rolled onto the payment.
+                if (txout.scriptPubKey.IsUnspendable())
+                    continue;
+
                 CTxDestination address;
                 if (ExtractDestination(txout.scriptPubKey, address))
                 {
@@ -147,6 +188,13 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
                 parts.append(sub);
             }
+            // If only OP_RETURN remained (should be rare after fAllToMe fix),
+            // surface fee as payment to self so the send still appears.
+            if (parts.isEmpty() && nTxFee > 0) {
+                parts.append(TransactionRecord(hash, nTime, TransactionRecord::SendToSelf, "",
+                                -nTxFee, 0));
+                parts.last().involvesWatchAddress = involvesWatchAddress;
+            }
         }
         else
         {
@@ -156,6 +204,12 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             parts.append(TransactionRecord(hash, nTime, TransactionRecord::Other, "", nNet, 0));
             parts.last().involvesWatchAddress = involvesWatchAddress;
         }
+    }
+
+    const QString note = ExtractTxNote(wtx);
+    if (!note.isEmpty()) {
+        for (TransactionRecord &rec : parts)
+            rec.note = note;
     }
 
     return parts;

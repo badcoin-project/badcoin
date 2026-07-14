@@ -7,6 +7,7 @@
 #include <base58.h>
 #include <chain.h>
 #include <chainparams.h>
+#include <ui_interface.h>
 #include <util.h>
 #include <validation.h>
 
@@ -94,9 +95,21 @@ void CPixieIndex::ReindexToHeight(const CChainParams& params, int target_height)
 
     CBlock block;
     PixieRejectCode reject;
-    LOCK(cs_main);
+    // Take cs_main per block so the GUI / other threads are not stuck for hours.
     for (int h = std::max(activation_height, 0); h <= target_height; ++h) {
-        CBlockIndex* pindex = chainActive[h];
+        if (h % 10000 == 0) {
+            LogPrintf("Pixie index reindex: height %d / %d\n", h, target_height);
+            uiInterface.InitMessage(strprintf("Rebuilding pixie index... %d%%",
+                target_height > 0 ? (100 * h / target_height) : 100));
+        }
+        CBlockIndex* pindex;
+        {
+            LOCK(cs_main);
+            pindex = chainActive[h];
+            if (!pindex) {
+                throw std::runtime_error("ReindexToHeight: missing block index");
+            }
+        }
         if (!ReadBlockFromDisk(block, pindex, params.GetConsensus())) {
             throw std::runtime_error("ReindexToHeight: ReadBlockFromDisk failed");
         }
@@ -105,8 +118,11 @@ void CPixieIndex::ReindexToHeight(const CChainParams& params, int target_height)
                                      PixieRejectCodeString(reject));
         }
     }
-    if (chainActive[target_height]) {
-        FlushToDisk(chainActive[target_height]->GetBlockHash());
+    {
+        LOCK(cs_main);
+        if (chainActive[target_height]) {
+            FlushToDisk(chainActive[target_height]->GetBlockHash());
+        }
     }
 }
 
@@ -146,7 +162,7 @@ void InitPixieIndex(const CChainParams& params, bool fReindexPixies)
         return;
 
     if (!idx.LoadFromDB(tip_hash)) {
-        LogPrintf("Pixie index: no matching DB at chain tip, will rebuild after block import\n");
+        LogPrintf("Pixie index: no matching DB at chain tip (use -reindex-pixies to rebuild)\n");
         idx.Clear();
     }
 }
@@ -162,6 +178,10 @@ void FinalizePixieIndexAfterBlockImport(const CChainParams& params, bool fReinde
         tip_hash = chainActive.Tip()->GetBlockHash();
     }
 
+    // Full-chain rebuild walks every block and re-checks yescrypt PoW. That
+    // can take many hours and holds cs_main the whole time, so the GUI freezes
+    // on the splash ("Done loading") and never shows the wallet. Only do it
+    // when explicitly requested via -reindex-pixies / -reindex-chainstate.
     if (fReindexPixies) {
         idx.ReindexFromChain(params);
         return;
@@ -169,7 +189,9 @@ void FinalizePixieIndexAfterBlockImport(const CChainParams& params, bool fReinde
 
     uint256 db_tip;
     if (!idx.GetPersistedTip(db_tip) || db_tip != tip_hash) {
-        idx.ReindexFromChain(params);
+        LogPrintf("Pixie index: DB tip does not match chain tip; skipping automatic "
+                  "full rebuild (use -reindex-pixies to rebuild). New blocks will "
+                  "still update the in-memory index.\n");
     }
 }
 

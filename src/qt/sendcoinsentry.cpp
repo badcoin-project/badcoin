@@ -31,14 +31,14 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
 
     setCurrentWidget(ui->SendCoins);
 
-    // Note used to be URI-only and hidden in clear(); keep it always visible and
-    // tall enough that the Send scroll area does not clip it under Amount.
+    // Keep Note visible. Maximum (not Minimum) so the entry does not stretch
+    // and leave Amount / Note floating in empty space.
     ui->messageLabel->show();
     ui->messageTextLabel->show();
     if (ui->messageWarningLabel)
         ui->messageWarningLabel->show();
-    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
-    setMinimumHeight(qMax(240, sizeHint().height()));
+    setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    setMinimumHeight(sizeHint().height());
 
     if (platformStyle->getUseExtraSpacing())
         ui->payToLayout->setSpacing(4);

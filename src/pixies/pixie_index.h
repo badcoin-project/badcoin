@@ -123,7 +123,7 @@ private:
 /** Open pixie DB and load from disk when chain tip is available. */
 void InitPixieIndex(const CChainParams& params, bool fReindexPixies);
 
-/** After block import / ActivateBestChain: rebuild index if DB missing or -reindex-pixies. */
+/** After block import / ActivateBestChain: rebuild index only if -reindex-pixies. */
 void FinalizePixieIndexAfterBlockImport(const CChainParams& params, bool fReindexPixies);
 
 } // namespace pixies

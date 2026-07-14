@@ -184,7 +184,7 @@ bool ValidateMintName(const std::string& name, PixieRejectCode& code)
 CAmount ExpectedMintBurnSats(uint32_t next_pixie_id)
 {
     if (next_pixie_id <= 100)
-        return 0;
+        return PIXIE_BURN_FOUNDING;
     if (next_pixie_id <= 1100)
         return PIXIE_BURN_EARLY;
     return PIXIE_BURN_STANDARD;
@@ -222,15 +222,15 @@ static bool ScriptIsPixieBurn(const CScript& script, CAmount expected_sats)
     return static_cast<CAmount>(cost) == expected_sats;
 }
 
-bool FindMintBurnOutput(const CTransaction& tx, CAmount expected_sats, bool founding_optional)
+bool FindMintBurnOutput(const CTransaction& tx, CAmount expected_sats, bool burn_optional)
 {
-    if (expected_sats == 0 && founding_optional) {
+    if (expected_sats == 0 && burn_optional) {
         for (const CTxOut& out : tx.vout) {
             if (out.scriptPubKey.size() >= 2 && out.scriptPubKey[0] == OP_RETURN &&
                 ScriptIsPixieBurn(out.scriptPubKey, 0))
                 return true;
         }
-        return true; // burn optional for founding
+        return true;
     }
     for (const CTxOut& out : tx.vout) {
         if (ScriptIsPixieBurn(out.scriptPubKey, expected_sats))

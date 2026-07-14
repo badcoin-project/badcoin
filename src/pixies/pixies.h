@@ -28,8 +28,11 @@ static const size_t PIXIE_MINT_PAYLOAD_MIN = 303;
 static const size_t PIXIE_MINT_PAYLOAD_MAX = 335;
 static const CAmount PIXIE_CONTROL_UTXO_VALUE = 546;
 
-static const CAmount PIXIE_BURN_EARLY = 10000000000;   // 100 BAD
-static const CAmount PIXIE_BURN_STANDARD = 50000000000; // 500 BAD
+/** Block subsidy 2,137 BAD — mint burns are multiples of this (ADR-0007 / badpixies). */
+static const CAmount PIXIE_BLOCK_SUBSIDY = 213700000000;       // 1 block
+static const CAmount PIXIE_BURN_FOUNDING = PIXIE_BLOCK_SUBSIDY; // 1 block
+static const CAmount PIXIE_BURN_EARLY = 5342500000000;         // 25 blocks (53,425 BAD)
+static const CAmount PIXIE_BURN_STANDARD = 21370000000000;     // 100 blocks (213,700 BAD)
 
 enum class PixieRejectCode {
     OK,
@@ -76,8 +79,8 @@ CAmount ExpectedMintBurnSats(uint32_t next_pixie_id);
 /** Find 546-sat P2PKH/P2SH control output; returns vout index or -1. */
 int FindControlUtxoVout(const CTransaction& tx);
 
-/** Expected burn output script for tier (BPIX + 8 byte LE cost). Empty if founding (optional). */
-bool FindMintBurnOutput(const CTransaction& tx, CAmount expected_sats, bool founding_optional);
+/** Expected burn output script for tier (BPIX + 8 byte LE cost). */
+bool FindMintBurnOutput(const CTransaction& tx, CAmount expected_sats, bool burn_optional);
 
 std::string PixieRejectCodeString(PixieRejectCode code);
 

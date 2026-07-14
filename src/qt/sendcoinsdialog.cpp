@@ -31,8 +31,10 @@
 #include <QHeaderView>
 #include <QScrollBar>
 #include <QSettings>
+#include <QSizePolicy>
 #include <QTableView>
 #include <QTextDocument>
+#include <QVBoxLayout>
 
 static const int SENT_HISTORY_LIMIT = 10;
 
@@ -65,6 +67,26 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+
+    // Top: recipients + fee + Send (no scrollbar). Bottom: sent history fills leftover.
+    ui->frameCoinControl->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    ui->scrollArea->setFrameShape(QFrame::NoFrame);
+    ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->scrollArea->setWidgetResizable(true);
+    ui->scrollArea->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    ui->frameFee->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
+    ui->frameSentHistory->setMaximumHeight(QWIDGETSIZE_MAX);
+    ui->frameSentHistory->setMinimumHeight(160);
+    ui->frameSentHistory->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    ui->sentHistoryView->setMaximumHeight(QWIDGETSIZE_MAX);
+    ui->sentHistoryView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    ui->verticalLayout->removeWidget(ui->frameSentHistory);
+    ui->verticalLayout->addWidget(ui->frameSentHistory, /*stretch=*/1);
+    for (int i = 0; i < ui->verticalLayout->count(); ++i) {
+        if (ui->verticalLayout->itemAt(i)->widget() != ui->frameSentHistory)
+            ui->verticalLayout->setStretch(i, 0);
+    }
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->addButton->setIcon(QIcon());
@@ -131,6 +153,7 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     ui->customFee->setValue(settings.value("nTransactionFee").toLongLong());
     ui->checkBoxMinimumFee->setChecked(settings.value("fPayOnlyMinFee").toBool());
     minimizeFeeSection(settings.value("fFeeSectionMinimized").toBool());
+    QTimer::singleShot(0, this, [this]() { fitRecipientArea(); });
 }
 
 void SendCoinsDialog::setClientModel(ClientModel *_clientModel)
@@ -218,7 +241,8 @@ void SendCoinsDialog::setupSentHistoryView()
     sentHistoryFilter->setSourceModel(model->getTransactionTableModel());
     sentHistoryFilter->setTypeFilter(
         TransactionFilterProxy::TYPE(TransactionRecord::SendToAddress) |
-        TransactionFilterProxy::TYPE(TransactionRecord::SendToOther));
+        TransactionFilterProxy::TYPE(TransactionRecord::SendToOther) |
+        TransactionFilterProxy::TYPE(TransactionRecord::SendToSelf));
     sentHistoryFilter->setLimit(SENT_HISTORY_LIMIT);
     sentHistoryFilter->setShowInactive(false);
     sentHistoryFilter->setDynamicSortFilter(true);
@@ -236,13 +260,15 @@ void SendCoinsDialog::setupSentHistoryView()
     view->horizontalHeader()->setHighlightSections(false);
     view->horizontalHeader()->setStretchLastSection(true);
 
-    // Compact columns: Status | Date | To | Amount (hide Watchonly + Type)
+    // Date | Label | Note | Amount
+    view->setColumnHidden(TransactionTableModel::Status, true);
     view->setColumnHidden(TransactionTableModel::Watchonly, true);
     view->setColumnHidden(TransactionTableModel::Type, true);
-    view->setColumnWidth(TransactionTableModel::Status, 40);
-    view->setColumnWidth(TransactionTableModel::Date, 120);
-    view->setColumnWidth(TransactionTableModel::ToAddress, 320);
-    view->horizontalHeader()->setSectionResizeMode(TransactionTableModel::ToAddress, QHeaderView::Stretch);
+    view->setColumnWidth(TransactionTableModel::Date, 130);
+    view->setColumnWidth(TransactionTableModel::ToAddress, 220);
+    view->setColumnWidth(TransactionTableModel::Note, 220);
+    view->horizontalHeader()->setSectionResizeMode(TransactionTableModel::ToAddress, QHeaderView::Interactive);
+    view->horizontalHeader()->setSectionResizeMode(TransactionTableModel::Note, QHeaderView::Stretch);
     view->horizontalHeader()->setSectionResizeMode(TransactionTableModel::Amount, QHeaderView::ResizeToContents);
 }
 
@@ -474,14 +500,35 @@ SendCoinsEntry *SendCoinsDialog::addEntry()
     // Focus the field, so that entry can start immediately
     entry->clear();
     entry->setFocus();
-    ui->scrollAreaWidgetContents->resize(ui->scrollAreaWidgetContents->sizeHint());
-    qApp->processEvents();
-    QScrollBar* bar = ui->scrollArea->verticalScrollBar();
-    if(bar)
-        bar->setSliderPosition(bar->maximum());
+    fitRecipientArea();
 
     updateTabsAndLabels();
     return entry;
+}
+
+void SendCoinsDialog::fitRecipientArea()
+{
+    // Size the recipient block to its content so Amount/Note are visible
+    // without a scrollbar; leftover window space goes to sent history.
+    if (!ui->scrollArea || !ui->entries)
+        return;
+
+    int h = 0;
+    for (int i = 0; i < ui->entries->count(); ++i) {
+        QLayoutItem *item = ui->entries->itemAt(i);
+        if (!item || !item->widget() || item->widget()->isHidden())
+            continue;
+        h += item->widget()->sizeHint().height();
+        if (h > 0)
+            h += ui->entries->spacing();
+    }
+    if (h > 0)
+        h -= ui->entries->spacing();
+    if (ui->scrollAreaWidgetContents && ui->scrollAreaWidgetContents->layout()) {
+        const QMargins m = ui->scrollAreaWidgetContents->contentsMargins();
+        h += m.top() + m.bottom();
+    }
+    ui->scrollArea->setFixedHeight(qMax(h, 1));
 }
 
 void SendCoinsDialog::updateTabsAndLabels()
@@ -500,6 +547,7 @@ void SendCoinsDialog::removeEntry(SendCoinsEntry* entry)
 
     entry->deleteLater();
 
+    fitRecipientArea();
     updateTabsAndLabels();
 }
 
