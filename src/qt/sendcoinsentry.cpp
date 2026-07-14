@@ -35,14 +35,17 @@ SendCoinsEntry::SendCoinsEntry(const PlatformStyle *_platformStyle, QWidget *par
     // tall enough that the Send scroll area does not clip it under Amount.
     ui->messageLabel->show();
     ui->messageTextLabel->show();
+    if (ui->messageWarningLabel)
+        ui->messageWarningLabel->show();
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
-    setMinimumHeight(qMax(220, sizeHint().height()));
+    setMinimumHeight(qMax(240, sizeHint().height()));
 
     if (platformStyle->getUseExtraSpacing())
         ui->payToLayout->setSpacing(4);
 #if QT_VERSION >= 0x040700
     ui->addAsLabel->setPlaceholderText(tr("Enter a label for this address to add it to your address book"));
-    ui->messageTextLabel->setPlaceholderText(tr("Optional note (public on-chain, max 80 bytes)"));
+    ui->messageTextLabel->setPlaceholderText(
+        tr("Would you like to add a note with this transaction? (optional)"));
 #endif
 
     // normal bitcoin address field
@@ -108,6 +111,8 @@ void SendCoinsEntry::clear()
     ui->messageTextLabel->clear();
     ui->messageTextLabel->show();
     ui->messageLabel->show();
+    if (ui->messageWarningLabel)
+        ui->messageWarningLabel->show();
     // clear UI elements for unauthenticated payment request
     ui->payTo_is->clear();
     ui->memoTextLabel_is->clear();
@@ -238,6 +243,8 @@ void SendCoinsEntry::setValue(const SendCoinsRecipient &value)
         ui->messageTextLabel->setText(recipient.message);
         ui->messageTextLabel->show();
         ui->messageLabel->show();
+        if (ui->messageWarningLabel)
+            ui->messageWarningLabel->show();
 
         ui->addAsLabel->clear();
         ui->payTo->setText(recipient.address); // this may set a label from addressbook

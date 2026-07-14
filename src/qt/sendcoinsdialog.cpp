@@ -401,8 +401,8 @@ void SendCoinsDialog::on_sendButton_clicked()
     // Warn once if any recipient carries a public note.
     for (const SendCoinsRecipient &rcp : currentTransaction.getRecipients()) {
         if (!rcp.paymentRequest.IsInitialized() && !rcp.message.trimmed().isEmpty()) {
-            questionString.append("<hr /><span style='color:#aa0000;'>");
-            questionString.append(tr("The note is public on the blockchain forever. Anyone can read it."));
+            questionString.append("<hr /><span style='color:#c0392b;'>");
+            questionString.append(tr("Please remember: this note will be visible on the blockchain to everyone."));
             questionString.append("</span>");
             break;
         }

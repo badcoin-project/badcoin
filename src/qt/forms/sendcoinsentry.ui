@@ -7,13 +7,13 @@
     <x>0</x>
     <y>0</y>
     <width>729</width>
-    <height>240</height>
+    <height>260</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
     <width>0</width>
-    <height>220</height>
+    <height>240</height>
    </size>
   </property>
   <property name="focusPolicy">
@@ -198,7 +198,7 @@
        <string>&amp;Note:</string>
       </property>
       <property name="alignment">
-       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+       <set>Qt::AlignRight|Qt::AlignTop|Qt::AlignTrailing</set>
       </property>
       <property name="buddy">
        <cstring>messageTextLabel</cstring>
@@ -206,17 +206,37 @@
      </widget>
     </item>
     <item row="3" column="1">
-     <widget class="QLineEdit" name="messageTextLabel">
-      <property name="toolTip">
-       <string>Optional public on-chain note (OP_RETURN). Anyone can read this forever on the blockchain. Leave blank for a private send. Max 80 UTF-8 bytes.</string>
+     <layout class="QVBoxLayout" name="noteLayout">
+      <property name="spacing">
+       <number>4</number>
       </property>
-      <property name="placeholderText">
-       <string>Optional note (public on-chain, max 80 bytes)</string>
-      </property>
-      <property name="maxLength">
-       <number>80</number>
-      </property>
-     </widget>
+      <item>
+       <widget class="QLineEdit" name="messageTextLabel">
+        <property name="toolTip">
+         <string>Optional. Anything you type here is written into the transaction and stored forever on the Badcoin blockchain. Anyone can read it. Leave blank for a private send. Max 80 UTF-8 bytes.</string>
+        </property>
+        <property name="placeholderText">
+         <string>Would you like to add a note with this transaction? (optional)</string>
+        </property>
+        <property name="maxLength">
+         <number>80</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="messageWarningLabel">
+        <property name="styleSheet">
+         <string notr="true">color: #c0392b;</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+         <string>Please remember: this note will be visible on the blockchain to everyone.</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
     <item row="4" column="0" colspan="2">
      <widget class="Line" name="line">
