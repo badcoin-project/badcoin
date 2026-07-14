@@ -83,11 +83,9 @@ MyAddressesPage::MyAddressesPage(const PlatformStyle *_platformStyle, QWidget *p
     buttonRow->addWidget(copyButton);
     buttonRow->addWidget(exportKeyButton);
     buttonRow->addWidget(removeButton);
-    buttonRow->addStretch();
-    // Import is the "bring in from outside" action; placed at the far right
-    // of the row, after a stretch, to set it apart from the existing
-    // manage-your-own-addresses buttons.
+    // Import sits next to Remove (same manage-address cluster users expect).
     buttonRow->addWidget(importButton);
+    buttonRow->addStretch();
     layout->addLayout(buttonRow);
 
     connect(newButton,       SIGNAL(clicked()), this, SLOT(onNew()));
