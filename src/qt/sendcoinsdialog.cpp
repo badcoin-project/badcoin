@@ -297,6 +297,10 @@ void SendCoinsDialog::on_sendButton_clicked()
             {
                 recipientElement = tr("%1 to %2").arg(amount, address);
             }
+            if (!rcp.message.trimmed().isEmpty()) {
+                recipientElement.append(QString("<br /><span style='font-size:10pt;'>%1 <i>%2</i></span>")
+                    .arg(tr("Public on-chain note:"), GUIUtil::HtmlEscape(rcp.message.trimmed())));
+            }
         }
         else if(!rcp.authenticatedMerchant.isEmpty()) // authenticated payment request
         {
@@ -347,6 +351,15 @@ void SendCoinsDialog::on_sendButton_clicked()
     }
     questionString.append("</span>");
 
+    // Warn once if any recipient carries a public note.
+    for (const SendCoinsRecipient &rcp : currentTransaction.getRecipients()) {
+        if (!rcp.paymentRequest.IsInitialized() && !rcp.message.trimmed().isEmpty()) {
+            questionString.append("<hr /><span style='color:#aa0000;'>");
+            questionString.append(tr("The note is public on the blockchain forever. Anyone can read it."));
+            questionString.append("</span>");
+            break;
+        }
+    }
 
     SendConfirmationDialog confirmationDialog(tr("Confirm send coins"),
         questionString.arg(formatted.join("<br />")), SEND_CONFIRM_DELAY, this);
@@ -574,6 +587,9 @@ void SendCoinsDialog::processSendCoinsReturn(const WalletModel::SendCoinsReturn 
     case WalletModel::PaymentRequestExpired:
         msgParams.first = tr("Payment request expired.");
         msgParams.second = CClientUIInterface::MSG_ERROR;
+        break;
+    case WalletModel::MessageTooLong:
+        msgParams.first = tr("The on-chain note is too long (max 80 UTF-8 bytes). Shorten it or leave it blank.");
         break;
     // included to prevent a compiler warning.
     case WalletModel::OK:

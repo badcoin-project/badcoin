@@ -448,6 +448,8 @@ void MyAddressesPage::onImportAddress()
                "To pick up any past transactions for this address, restart "
                "badcoin-qt with `-rescan`, or run `rescanblockchain` in the "
                "debug console (Help > Debug window > Console). Future "
-               "transactions are picked up automatically."));
+               "transactions are picked up automatically.\n\n"
+               "Back up your wallet again. The imported key may not be present "
+               "in older backups."));
     }
 }

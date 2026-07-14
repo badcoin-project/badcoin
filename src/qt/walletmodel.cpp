@@ -29,6 +29,9 @@
 #include <wallet/wallet.h>
 #include <wallet/walletdb.h> // for BackupWallet
 
+#include <script/script.h>
+#include <script/standard.h>
+
 #include <stdint.h>
 
 #include <QDebug>
@@ -259,6 +262,28 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
     if(setAddress.size() != nAddresses)
     {
         return DuplicateAddress;
+    }
+
+    // Attach at most one public on-chain note (OP_RETURN), matching the
+    // Chrome plugin's 80-byte memo cap. Blank note = private send.
+    {
+        QString note;
+        for (const SendCoinsRecipient &rcp : recipients) {
+            if (!rcp.paymentRequest.IsInitialized() && !rcp.message.trimmed().isEmpty()) {
+                note = rcp.message.trimmed();
+                break;
+            }
+        }
+        if (!note.isEmpty()) {
+            const QByteArray utf8 = note.toUtf8();
+            static const int kMaxNoteBytes = 80;
+            if (utf8.size() > kMaxNoteBytes)
+                return MessageTooLong;
+            CScript dataScript;
+            dataScript << OP_RETURN << std::vector<unsigned char>(utf8.begin(), utf8.end());
+            CRecipient noteRecipient = {dataScript, 0, false};
+            vecSend.push_back(noteRecipient);
+        }
     }
 
     CAmount nBalance = getBalance(&coinControl);

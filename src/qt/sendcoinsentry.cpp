@@ -97,8 +97,8 @@ void SendCoinsEntry::clear()
     ui->payAmount->clear();
     ui->checkboxSubtractFeeFromAmount->setCheckState(Qt::Unchecked);
     ui->messageTextLabel->clear();
-    ui->messageTextLabel->hide();
-    ui->messageLabel->hide();
+    ui->messageTextLabel->show();
+    ui->messageLabel->show();
     // clear UI elements for unauthenticated payment request
     ui->payTo_is->clear();
     ui->memoTextLabel_is->clear();
@@ -163,6 +163,11 @@ bool SendCoinsEntry::validate()
         retval = false;
     }
 
+    // On-chain note length (UTF-8 bytes). Cap matches Chrome plugin OP_RETURN memo.
+    if (ui->messageTextLabel->text().toUtf8().size() > 80) {
+        retval = false;
+    }
+
     return retval;
 }
 
@@ -188,7 +193,8 @@ QWidget *SendCoinsEntry::setupTabChain(QWidget *prev)
     QWidget::setTabOrder(ui->payTo, ui->addAsLabel);
     QWidget *w = ui->payAmount->setupTabChain(ui->addAsLabel);
     QWidget::setTabOrder(w, ui->checkboxSubtractFeeFromAmount);
-    QWidget::setTabOrder(ui->checkboxSubtractFeeFromAmount, ui->addressBookButton);
+    QWidget::setTabOrder(ui->checkboxSubtractFeeFromAmount, ui->messageTextLabel);
+    QWidget::setTabOrder(ui->messageTextLabel, ui->addressBookButton);
     QWidget::setTabOrder(ui->addressBookButton, ui->pasteButton);
     QWidget::setTabOrder(ui->pasteButton, ui->deleteButton);
     return ui->deleteButton;
@@ -219,10 +225,10 @@ void SendCoinsEntry::setValue(const SendCoinsRecipient &value)
     }
     else // normal payment
     {
-        // message
+        // Editable public on-chain note (also receives URI ?message= prefill)
         ui->messageTextLabel->setText(recipient.message);
-        ui->messageTextLabel->setVisible(!recipient.message.isEmpty());
-        ui->messageLabel->setVisible(!recipient.message.isEmpty());
+        ui->messageTextLabel->show();
+        ui->messageLabel->show();
 
         ui->addAsLabel->clear();
         ui->payTo->setText(recipient.address); // this may set a label from addressbook

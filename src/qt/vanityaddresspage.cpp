@@ -801,7 +801,9 @@ void VanityAddressPage::onSaveToWallet()
     }
     QMessageBox::information(this, tr("Saved"),
         tr("The vanity address is now in your wallet. You can export its private "
-           "key from the My Addresses tab."));
+           "key from the My Addresses tab.\n\n"
+           "Back up your wallet again. The new key may not be present in older "
+           "backups."));
     updateButtons();
 }
 
