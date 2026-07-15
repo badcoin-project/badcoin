@@ -838,7 +838,10 @@ fi
 
 if test x$use_boost = xyes; then
 
-BOOST_LIBS="$BOOST_LDFLAGS $BOOST_SYSTEM_LIB $BOOST_FILESYSTEM_LIB $BOOST_PROGRAM_OPTIONS_LIB $BOOST_THREAD_LIB $BOOST_CHRONO_LIB"
+dnl Keep dependent static Boost libraries before the libraries that satisfy them.
+dnl This matters for one-pass mingw linkers: Boost.Thread sleep_for uses
+dnl Boost.Chrono, and several Boost libraries may require Boost.System.
+BOOST_LIBS="$BOOST_LDFLAGS $BOOST_FILESYSTEM_LIB $BOOST_PROGRAM_OPTIONS_LIB $BOOST_THREAD_LIB $BOOST_CHRONO_LIB $BOOST_SYSTEM_LIB"
 
 
 dnl If boost (prior to 1.57) was built without c++11, it emulated scoped enums
