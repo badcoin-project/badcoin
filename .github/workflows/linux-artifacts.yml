@@ -63,7 +63,28 @@ jobs:
             --disable-dependency-tracking \
             --disable-tests \
             --disable-bench \
-            --without-gui
+            --without-gui || {
+              status=$?
+              echo "::group::config.log tail"
+              if [ -f config.log ]; then
+                tail -n 300 config.log
+              else
+                echo "config.log not found"
+              fi
+              echo "::endgroup::"
+              exit "$status"
+            }
+
+      - name: Upload Linux configure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-linux-config-logs
+          path: |
+            config.log
+            config.status
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build
         run: |
