@@ -85,6 +85,32 @@ jobs:
             --disable-bench \
             ${{ matrix.configure_extra }}
 
+      - name: Show configure logs on failure
+        if: failure()
+        run: |
+          set -u
+          echo "Working directory: $PWD"
+          echo "Searching for config.log files under the workspace..."
+          found=0
+          while IFS= read -r -d '' log; do
+            found=1
+            echo "::group::Last 300 lines of $log"
+            tail -n 300 "$log" || true
+            echo "::endgroup::"
+          done < <(find "$PWD" -name config.log -type f -print0 | sort -z)
+          if [ "$found" -eq 0 ]; then
+            echo "No config.log files found under $PWD"
+          fi
+
+      - name: Upload configure logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: config-logs-windows-x64-${{ matrix.variant }}
+          path: '**/config.log'
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Build
         run: |
           set -eux
