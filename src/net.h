@@ -51,16 +51,20 @@ static const int FEELER_INTERVAL = 120;
 static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
-/** Maximum length of incoming protocol messages (no message over 4 MB is currently acceptable). */
-//static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 4 * 1000 * 1000;
 /**
- * Maximum length of incoming protocol messages (no message over 32 MiB is
- * currently acceptable).  Bitcoin has 4 MiB here, but we need more space
- * to allow for 2,000 block headers with auxpow.
+ * Maximum length of incoming protocol messages.
+ *
+ * Bitcoin uses 4 MiB. BadCoin historically used 32 MiB (inherited from
+ * Namecoin) so that getheaders batches of up to MAX_HEADERS_RESULTS (2000)
+ * auxpow headers could sync. Measured BadCoin mainnet (2026-07-17, every
+ * active-chain header through height 1,865,375) shows a largest real
+ * 2,000-header message of only 0.1704 MiB; a conservative synthetic batch
+ * of 2,000 x 4 KiB headers is ~7.82 MiB. 8 MiB therefore cuts the receive
+ * / DoS ceiling by 75% while covering current history and that planning
+ * case. Bitcoin's 4 MiB remains deferred until auxpow parent-coinbase size
+ * is bounded or headers packing uses a byte budget (see issue #1).
  */
-/* TODO: FIXME: Badcoin Once the headers size limit is deployed sufficiently in the network,
-   we may want to lower this again if it seems useful.  */
-static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 32 * 1024 * 1024;
+static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 8 * 1024 * 1024;
 /** Maximum length of strSubVer in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 /** Maximum number of automatic outgoing nodes */

@@ -100,6 +100,7 @@ BASE_SCRIPTS= [
     'feature_proxy.py',
     'rpc_signrawtransaction.py',
     'p2p_disconnect_ban.py',
+    'p2p_message_size.py',
     'rpc_decodescript.py',
     'rpc_blockchain.py',
     'rpc_deprecated.py',
