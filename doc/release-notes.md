@@ -49,7 +49,34 @@ frequently tested on them.
 Notable changes
 ===============
 
-(to be filled in)
+Data carrier (OP_RETURN) default raised to 512-byte payloads
+-----------------------------------------------------------
+
+The default `-datacarriersize` / `MAX_OP_RETURN_RELAY` is now **516** script
+bytes. That is the complete `OP_RETURN` scriptPubKey size, and it allows a
+single canonical push of **512 metadata bytes**
+(`OP_RETURN` + `OP_PUSHDATA2` + 2-byte length + 512 payload).
+
+This is a **standardness / relay / mining policy** change only. It is not a
+consensus soft fork or hard fork. Blocks containing larger data-carrier
+outputs remain valid to old nodes.
+
+Operational notes:
+
+- Old nodes that still default to 83 will reject these transactions from their
+  mempool and will not relay them. Once an upgraded miner confirms one, old
+  nodes accept the block.
+- Operators can keep the historical Bitcoin Core limit with
+  `-datacarriersize=83`, or disable data carriers with `-datacarrier=0`.
+- Only one `OP_RETURN` output per transaction remains standard.
+- Resource impact versus the previous 80-byte default: up to ~435 additional
+  transaction bytes per maximum-sized data-carrier output (~1,740 weight
+  units). Fees, relay bandwidth, and storage grow accordingly. OP_RETURN
+  outputs are unspendable and do not grow the spendable UTXO set.
+
+This unblocks full on-chain metadata use cases (including BadPixies-style
+payloads up to 512 bytes) without embedding any Pixie-specific consensus
+logic in Core.
 
 0.16.x change log
 ------------------
