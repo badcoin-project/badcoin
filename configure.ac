@@ -769,8 +769,31 @@ AX_BOOST_BASE([MINIMUM_REQUIRED_BOOST])
 if test x$want_boost = xno; then
     AC_MSG_ERROR([[only libbitcoinconsensus can be built without boost]])
 fi
-dnl AX_BOOST_SYSTEM is header-only in Boost 1.69+; skip linking against boost_system.
-dnl AX_BOOST_SYSTEM
+
+dnl boost_system became header-only in Boost 1.69+; AX_BOOST_SYSTEM's
+dnl 0.16-era check fails against a modern Boost that ships no separate
+dnl libboost_system (e.g. Homebrew Boost 1.90). Detect the actual Boost
+dnl version here, before probing for boost_system, so the probe (and the
+dnl later BOOST_LIBS assembly further down) only run for Boost versions
+dnl that actually need and have a linkable boost_system (e.g. the 1.64.0
+dnl pinned by depends/).
+TEMP_CPPFLAGS="$CPPFLAGS"
+CPPFLAGS="$CPPFLAGS $BOOST_CPPFLAGS"
+AC_MSG_CHECKING([whether this Boost version needs explicit boost_system linking])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+  #include <boost/version.hpp>
+  ]],[[
+  #if BOOST_VERSION >= 106900
+    choke me
+  #endif
+  ]])],
+  [boost_system_needed=yes; AC_MSG_RESULT([yes, Boost < 1.69])],
+  [boost_system_needed=no; AC_MSG_RESULT([no, Boost >= 1.69 (header-only)])])
+CPPFLAGS="$TEMP_CPPFLAGS"
+
+if test x$boost_system_needed = xyes; then
+  AX_BOOST_SYSTEM
+fi
 AX_BOOST_FILESYSTEM
 AX_BOOST_PROGRAM_OPTIONS
 AX_BOOST_THREAD
@@ -841,29 +864,11 @@ fi
 
 if test x$use_boost = xyes; then
 
-dnl boost_system became header-only in Boost 1.69+ and does not need to be
-dnl linked there. Older Boost (including the 1.64.0 pinned by depends/)
-dnl still requires it, notably for boost::thread's sleep_for checked just
-dnl below. Detect the actual Boost version at configure time rather than
-dnl assuming a modern one; a build host's system Boost may differ widely
-dnl from the depends/-pinned version used for release builds.
-TEMP_CPPFLAGS="$CPPFLAGS"
-CPPFLAGS="$CPPFLAGS $BOOST_CPPFLAGS"
-AC_MSG_CHECKING([whether this Boost version needs explicit boost_system linking])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
-  #include <boost/version.hpp>
-  ]],[[
-  #if BOOST_VERSION >= 106900
-    choke me
-  #endif
-  ]])],
-  [boost_system_needed=yes; AC_MSG_RESULT([yes, Boost < 1.69])],
-  [boost_system_needed=no; AC_MSG_RESULT([no, Boost >= 1.69 (header-only)])])
-CPPFLAGS="$TEMP_CPPFLAGS"
-
 dnl Keep dependent static Boost libraries before the libraries that satisfy them.
 dnl This matters for one-pass mingw linkers: Boost.Thread sleep_for uses
 dnl Boost.Chrono, and several Boost libraries may require Boost.System.
+dnl boost_system_needed was determined earlier, alongside the conditional
+dnl AX_BOOST_SYSTEM call.
 if test x$boost_system_needed = xyes; then
 BOOST_LIBS="$BOOST_LDFLAGS $BOOST_FILESYSTEM_LIB $BOOST_PROGRAM_OPTIONS_LIB $BOOST_THREAD_LIB $BOOST_CHRONO_LIB $BOOST_SYSTEM_LIB"
 else
