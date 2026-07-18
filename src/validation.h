@@ -20,7 +20,9 @@
 #include <versionbits.h>
 
 #include <algorithm>
+#include <atomic>
 #include <exception>
+#include <list>
 #include <map>
 #include <memory>
 #include <set>

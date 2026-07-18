@@ -2392,7 +2392,15 @@ bool CWallet::SelectCoinsMinConf(const CAmount& nTargetValue, const int nConfMin
     std::vector<CInputCoin> vValue;
     CAmount nTotalLower = 0;
 
-    random_shuffle(vCoins.begin(), vCoins.end(), GetRandInt);
+    // C++17 removed std::random_shuffle. Do an equivalent in-place
+    // Fisher-Yates shuffle using the wallet's existing RNG; GetRandInt(n)
+    // returns a uniformly distributed value in [0, n).
+    for (size_t i = vCoins.size(); i > 1; --i) {
+        size_t j = GetRandInt(i);
+        COutput tmp = vCoins[i - 1];
+        vCoins[i - 1] = vCoins[j];
+        vCoins[j] = tmp;
+    }
 
     for (const COutput &output : vCoins)
     {
