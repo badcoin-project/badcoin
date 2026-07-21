@@ -60,8 +60,10 @@ case $host in
      lt_cv_deplibs_check_method="pass_all"
   ;;
 esac
-dnl Require C++11 compiler (no GNU extensions)
-AX_CXX_COMPILE_STDCXX([11], [noext], [mandatory], [nodefault])
+dnl Require C++17 compiler (no GNU extensions).
+dnl Bumped from C++11: protobuf >= 22 / abseil (pulled in by BIP70
+dnl payment-request support) require C++17 to compile.
+AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory], [nodefault])
 dnl Check if -latomic is required for <std::atomic>
 CHECK_ATOMIC
 
@@ -767,7 +769,31 @@ AX_BOOST_BASE([MINIMUM_REQUIRED_BOOST])
 if test x$want_boost = xno; then
     AC_MSG_ERROR([[only libbitcoinconsensus can be built without boost]])
 fi
-AX_BOOST_SYSTEM
+
+dnl boost_system became header-only in Boost 1.69+; AX_BOOST_SYSTEM's
+dnl 0.16-era check fails against a modern Boost that ships no separate
+dnl libboost_system (e.g. Homebrew Boost 1.90). Detect the actual Boost
+dnl version here, before probing for boost_system, so the probe (and the
+dnl later BOOST_LIBS assembly further down) only run for Boost versions
+dnl that actually need and have a linkable boost_system (e.g. the 1.64.0
+dnl pinned by depends/).
+TEMP_CPPFLAGS="$CPPFLAGS"
+CPPFLAGS="$CPPFLAGS $BOOST_CPPFLAGS"
+AC_MSG_CHECKING([whether this Boost version needs explicit boost_system linking])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+  #include <boost/version.hpp>
+  ]],[[
+  #if BOOST_VERSION >= 106900
+    choke me
+  #endif
+  ]])],
+  [boost_system_needed=yes; AC_MSG_RESULT([yes, Boost < 1.69])],
+  [boost_system_needed=no; AC_MSG_RESULT([no, Boost >= 1.69 (header-only)])])
+CPPFLAGS="$TEMP_CPPFLAGS"
+
+if test x$boost_system_needed = xyes; then
+  AX_BOOST_SYSTEM
+fi
 AX_BOOST_FILESYSTEM
 AX_BOOST_PROGRAM_OPTIONS
 AX_BOOST_THREAD
@@ -841,7 +867,13 @@ if test x$use_boost = xyes; then
 dnl Keep dependent static Boost libraries before the libraries that satisfy them.
 dnl This matters for one-pass mingw linkers: Boost.Thread sleep_for uses
 dnl Boost.Chrono, and several Boost libraries may require Boost.System.
+dnl boost_system_needed was determined earlier, alongside the conditional
+dnl AX_BOOST_SYSTEM call.
+if test x$boost_system_needed = xyes; then
 BOOST_LIBS="$BOOST_LDFLAGS $BOOST_FILESYSTEM_LIB $BOOST_PROGRAM_OPTIONS_LIB $BOOST_THREAD_LIB $BOOST_CHRONO_LIB $BOOST_SYSTEM_LIB"
+else
+BOOST_LIBS="$BOOST_LDFLAGS $BOOST_FILESYSTEM_LIB $BOOST_PROGRAM_OPTIONS_LIB $BOOST_THREAD_LIB $BOOST_CHRONO_LIB"
+fi
 
 
 dnl If boost (prior to 1.57) was built without c++11, it emulated scoped enums
