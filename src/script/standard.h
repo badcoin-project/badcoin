@@ -28,10 +28,14 @@ public:
 };
 
 /**
- * Default setting for nMaxDatacarrierBytes. 80 bytes of data, +1 for OP_RETURN,
- * +2 for the pushdata opcodes.
+ * Default setting for nMaxDatacarrierBytes. This is the maximum complete
+ * TX_NULL_DATA scriptPubKey size considered standard (not the raw payload
+ * alone). A single canonical push of 512 metadata bytes is encoded as:
+ *   1 byte OP_RETURN + 1 byte OP_PUSHDATA2 + 2-byte length + 512 payload = 516.
+ * Operators can retain the historical Bitcoin Core default with
+ * -datacarriersize=83 (80 payload bytes).
  */
-static const unsigned int MAX_OP_RETURN_RELAY = 83;
+static const unsigned int MAX_OP_RETURN_RELAY = 516;
 
 /**
  * A data carrying output is an unspendable output containing data. The script
