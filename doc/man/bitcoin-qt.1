@@ -441,8 +441,8 @@ Relay and mine data carrier transactions (default: 1)
 .HP
 \fB\-datacarriersize\fR
 .IP
-Maximum size of data in data carrier transactions we relay and mine
-(default: 83)
+Maximum size of data-carrier (OP_RETURN) scriptPubKey we relay and mine,
+in bytes including opcodes (default: 516; a 512-byte payload needs 516)
 .HP
 \fB\-mempoolreplacement\fR
 .IP

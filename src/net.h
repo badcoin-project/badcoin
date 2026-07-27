@@ -24,6 +24,7 @@
 
 #include <atomic>
 #include <deque>
+#include <list>
 #include <stdint.h>
 #include <thread>
 #include <memory>
