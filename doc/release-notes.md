@@ -49,8 +49,25 @@ frequently tested on them.
 Notable changes
 ===============
 
+P2P message size limit lowered to 8 MiB
+------------------------------------------------------------
+
+`MAX_PROTOCOL_MESSAGE_LENGTH` is lowered from **32 MiB** to **8 MiB**.
+
+This closes the long-standing Namecoin-inherited FIXME tracked in issue #1.
+BadCoin mainnet measurement of every active-chain header through height
+1,865,375 found a largest real 2,000-header message of only **0.1704 MiB**.
+An 8 MiB ceiling still covers a conservative synthetic batch of 2,000 x 4 KiB
+headers (~7.82 MiB) while cutting the receive / DoS ceiling by 75%.
+
+Bitcoin's 4 MiB value is intentionally **not** adopted yet: auxpow parent
+coinbase size remains unbounded, so 4 MiB should wait for byte-budget header
+batching and/or an auxpow-size rule.
+
+
+
 Data carrier (OP_RETURN) default raised to 512-byte payloads
------------------------------------------------------------
+------------------------------------------------------------
 
 The default `-datacarriersize` / `MAX_OP_RETURN_RELAY` is now **516** script
 bytes. That is the complete `OP_RETURN` scriptPubKey size, and it allows a
@@ -77,6 +94,7 @@ Operational notes:
 This unblocks full on-chain metadata use cases (including BadPixies-style
 payloads up to 512 bytes) without embedding any Pixie-specific consensus
 logic in Core.
+
 
 0.16.x change log
 ------------------
