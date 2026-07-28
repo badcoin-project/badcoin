@@ -15,6 +15,7 @@
 #include <validationinterface.h>
 
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -28,6 +29,8 @@ BOOST_FIXTURE_TEST_SUITE(validation_block_tests, RegtestingSetup)
 
 struct TestSubscriber : public CValidationInterface {
     uint256 m_expected_tip;
+    boost::mutex m_mutex;
+    std::map<std::string, std::string> m_validation_failures;
 
     TestSubscriber(uint256 tip) : m_expected_tip(tip) {}
 
@@ -50,6 +53,21 @@ struct TestSubscriber : public CValidationInterface {
 
         m_expected_tip = block->hashPrevBlock;
     }
+
+    void BlockChecked(const CBlock& block, const CValidationState& state)
+    {
+        if (!state.IsValid()) {
+            boost::mutex::scoped_lock lock(m_mutex);
+            m_validation_failures[block.GetHash().ToString()] = FormatStateMessage(state);
+        }
+    }
+
+    std::string FailureReason(const std::string& hash)
+    {
+        boost::mutex::scoped_lock lock(m_mutex);
+        auto it = m_validation_failures.find(hash);
+        return it == m_validation_failures.end() ? "no BlockChecked rejection reason captured" : it->second;
+    }
 };
 
 std::shared_ptr<CBlock> Block(const CBlockIndex* pindexPrev)
@@ -69,6 +87,7 @@ std::shared_ptr<CBlock> Block(const CBlockIndex* pindexPrev)
 
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
     txCoinbase.vout.resize(1);
+    txCoinbase.vout[0].nValue = 0;
     txCoinbase.vin[0].scriptSig = CScript() << pindexPrev->nHeight + 1 << OP_0;
     txCoinbase.vin[0].scriptWitness.SetNull();
     pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
@@ -218,7 +237,7 @@ BOOST_AUTO_TEST_CASE(processnewblock_signals_ordering)
     UnregisterValidationInterface(&sub);
 
     if (!failures.empty()) {
-        BOOST_ERROR("valid block was not processed: " + failures.front());
+        BOOST_ERROR("valid block was not processed: " + failures.front() + ": " + sub.FailureReason(failures.front()));
     }
     BOOST_CHECK_EQUAL(sub.m_expected_tip, chainActive.Tip()->GetBlockHash());
 }

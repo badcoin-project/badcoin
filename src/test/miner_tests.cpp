@@ -18,13 +18,17 @@
 #include <uint256.h>
 #include <util.h>
 #include <utilstrencodings.h>
+#include <validationinterface.h>
 
 #include <test/test_bitcoin.h>
 
 #include <algorithm>
+#include <map>
 #include <memory>
+#include <string>
 
 #include <boost/test/unit_test.hpp>
+#include <boost/thread.hpp>
 
 struct BadcoinMinerTestingSetup : public TestingSetup {
     BadcoinMinerTestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
@@ -41,6 +45,28 @@ public:
     };
 private:
     const std::string m_reason;
+};
+
+class BlockValidationCapture : public CValidationInterface {
+public:
+    void BlockChecked(const CBlock& block, const CValidationState& state)
+    {
+        if (!state.IsValid()) {
+            boost::mutex::scoped_lock lock(m_mutex);
+            m_rejections[block.GetHash().ToString()] = FormatStateMessage(state);
+        }
+    }
+
+    std::string RejectionFor(const uint256& hash)
+    {
+        boost::mutex::scoped_lock lock(m_mutex);
+        auto it = m_rejections.find(hash.ToString());
+        return it == m_rejections.end() ? "no BlockChecked rejection reason captured" : it->second;
+    }
+
+private:
+    boost::mutex m_mutex;
+    std::map<std::string, std::string> m_rejections;
 };
 
 static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
@@ -198,8 +224,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     {
         pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey, ALGO_SHA256D);
         CBlock block = pblocktemplate->block;
+        int block_height = 0;
         {
             LOCK(cs_main);
+            block_height = chainActive.Height() + 1;
             block.nTime = std::max<int64_t>(
                 chainActive.Tip()->GetBlockTime() + chainparams.GetConsensus().nPowTargetSpacing * 3,
                 chainActive.Tip()->GetMedianTimePast() + 1);
@@ -215,10 +243,19 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
                 txFirst.push_back(block.vtx[0]);
             }
             CValidationState state;
-            BOOST_REQUIRE_MESSAGE(TestBlockValidity(state, chainparams, block, chainActive.Tip(), false, false), FormatStateMessage(state));
+            if (!TestBlockValidity(state, chainparams, block, chainActive.Tip(), false, false)) {
+                BOOST_FAIL(strprintf("height=%d block=%s TestBlockValidity failed: %s", block_height, block.GetHash().ToString(), FormatStateMessage(state)));
+            }
         }
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(block);
-        BOOST_REQUIRE_MESSAGE(ProcessNewBlock(chainparams, shared_pblock, true, nullptr), block.GetHash().ToString());
+        BlockValidationCapture validation_capture;
+        RegisterValidationInterface(&validation_capture);
+        const bool processed = ProcessNewBlock(chainparams, shared_pblock, true, nullptr);
+        SyncWithValidationInterfaceQueue();
+        UnregisterValidationInterface(&validation_capture);
+        if (!processed) {
+            BOOST_FAIL(strprintf("height=%d block=%s ProcessNewBlock failed: %s", block_height, block.GetHash().ToString(), validation_capture.RejectionFor(block.GetHash())));
+        }
     }
 
     LOCK(cs_main);
