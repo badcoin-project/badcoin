@@ -11,6 +11,7 @@
 #include <validation.h>
 #include <miner.h>
 #include <policy/policy.h>
+#include <pow.h>
 #include <pubkey.h>
 #include <script/standard.h>
 #include <txmempool.h>
@@ -20,11 +21,16 @@
 
 #include <test/test_bitcoin.h>
 
+#include <algorithm>
 #include <memory>
 
 #include <boost/test/unit_test.hpp>
 
-BOOST_FIXTURE_TEST_SUITE(miner_tests, TestingSetup)
+struct BadcoinMinerTestingSetup : public TestingSetup {
+    BadcoinMinerTestingSetup() : TestingSetup(CBaseChainParams::REGTEST) {}
+};
+
+BOOST_FIXTURE_TEST_SUITE(miner_tests, BadcoinMinerTestingSetup)
 
 // BOOST_CHECK_EXCEPTION predicates to check the specific validation error
 class HasReason {
@@ -46,41 +52,6 @@ static BlockAssembler AssemblerForTest(const CChainParams& params) {
     options.blockMinFeeRate = blockMinFeeRate;
     return BlockAssembler(params, options);
 }
-
-static
-struct {
-    unsigned char extranonce;
-    unsigned int nonce;
-} blockinfo[] = {
-    {0, 0x000e2c18}, {0, 0x001bb1dc}, {0, 0x000ee4c3}, {0, 0x001a52f4},
-    {0, 0x00143675}, {0, 0x0001e51f}, {0, 0x00005a67}, {0, 0x000190e4},
-    {0, 0x0020bf5e}, {0, 0x00126808}, {0, 0x0001f866}, {0, 0x0007fc02},
-    {0, 0x000c1f4e}, {0, 0x001b7095}, {0, 0x001e95aa}, {0, 0x00118d21},
-    {0, 0x00040c8d}, {0, 0x0000c5f4}, {0, 0x0001cfcb}, {0, 0x00001080},
-    {0, 0x00026bcb}, {0, 0x000d8727}, {0, 0x001a13c7}, {0, 0x000a3af4},
-    {0, 0x00043bf5}, {0, 0x0020453e}, {0, 0x0008d3c6}, {0, 0x0000f4f1},
-    {0, 0x00000a1a}, {0, 0x00065811}, {0, 0x0045aedf}, {0, 0x00106b93},
-    {0, 0x000f520d}, {0, 0x00267a49}, {0, 0x000d3075}, {0, 0x0011f8ec},
-    {0, 0x002c19d0}, {0, 0x001e04d5}, {0, 0x001462a8}, {0, 0x0012fadf},
-    {0, 0x000da892}, {0, 0x003d478c}, {0, 0x000eba7c}, {0, 0x001fec4a},
-    {0, 0x0035bede}, {0, 0x00142fe7}, {0, 0x0006f28d}, {0, 0x0008c38e},
-    {0, 0x00054678}, {0, 0x000b826d}, {0, 0x0001840c}, {0, 0x0016db83},
-    {0, 0x0013ffba}, {0, 0x00018e9c}, {0, 0x000f4bf3}, {0, 0x00059d26},
-    {0, 0x0001c0c0}, {0, 0x000828fa}, {0, 0x00059e54}, {0, 0x00131b41},
-    {0, 0x002304dc}, {0, 0x00012d2d}, {0, 0x000ef071}, {0, 0x001e788f},
-    {0, 0x002a1ca9}, {0, 0x000756e5}, {0, 0x000ea527}, {0, 0x0009678a},
-    {0, 0x0013a307}, {0, 0x0036019a}, {0, 0x00149df2}, {0, 0x00031f99},
-    {0, 0x000184f4}, {0, 0x000c30cf}, {0, 0x000db807}, {0, 0x0010d4e8},
-    {0, 0x000b6cbb}, {0, 0x0006cbba}, {0, 0x001374ee}, {0, 0x003dd80f},
-    {0, 0x00031e93}, {0, 0x0013f2c2}, {0, 0x001868c3}, {0, 0x002048dd},
-    {0, 0x00057391}, {0, 0x00002c39}, {0, 0x000462aa}, {0, 0x0008ff59},
-    {0, 0x000dd2cb}, {0, 0x001364ad}, {0, 0x00026f3a}, {0, 0x00108ff3},
-    {0, 0x001b0d40}, {0, 0x0001fe36}, {0, 0x00172902}, {0, 0x001bec95},
-    {0, 0x001d2a18}, {0, 0x00006332}, {0, 0x0002407a}, {0, 0x00141527},
-    {0, 0x0004481e}, {0, 0x002a472e}, {0, 0x00185cad}, {0, 0x000de5b7},
-    {0, 0x000ae463}, {0, 0x001661b7}, {0, 0x000817d5}, {0, 0x000ab2f2},
-    {0, 0x00030213}, {0, 0x001aebf9},
-};
 
 CBlockIndex CreateBlockIndex(int nHeight)
 {
@@ -205,8 +176,7 @@ void TestPackageSelection(const CChainParams& chainparams, CScript scriptPubKey,
 BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 {
     // Note that by default, these tests run with size accounting enabled.
-    const auto chainParams = CreateChainParams(CBaseChainParams::MAIN);
-    const CChainParams& chainparams = *chainParams;
+    const CChainParams& chainparams = Params();
     CScript scriptPubKey = CScript() << ParseHex("04e941763c7750969e751bee1ffbe96a651a0feb131db046546c219ea40bff40b95077dc9ba1c05af991588772d8daabbda57386c068fb9bc7477c5e28702d5eb9") << OP_CHECKSIG;
     std::unique_ptr<CBlockTemplate> pblocktemplate;
     CMutableTransaction tx,tx2;
@@ -221,45 +191,43 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // Simple block creation, nothing special yet:
     BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey, ALGO_SHA256D));
 
-    // We can't make transactions until we have inputs
-    // Therefore, load 100 blocks :)
+    // We can't make transactions until we have mature inputs.
     int baseheight = 0;
     std::vector<CTransactionRef> txFirst;
-    for (unsigned int i = 0; i < sizeof(blockinfo)/sizeof(*blockinfo); ++i)
+    for (unsigned int i = 0; i < COINBASE_MATURITY + 5; ++i)
     {
-        CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+        pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey, ALGO_SHA256D);
+        CBlock block = pblocktemplate->block;
         {
             LOCK(cs_main);
-            pblock->nVersion = 2; // Badcoin: started at version 2
-            pblock->nTime = chainActive.Tip()->GetMedianTimePast()+(i+1)*600;  // Badcoin: altered to account for difficulty adjustments
-            CMutableTransaction txCoinbase(*pblock->vtx[0]);
-            txCoinbase.nVersion = 1;
-            // Badcoin: BIP34 is already active:
-            //txCoinbase.vin[0].scriptSig = CScript();
-            //txCoinbase.vin[0].scriptSig.push_back(blockinfo[i].extranonce);
-            //txCoinbase.vin[0].scriptSig.push_back(chainActive.Height());
-            txCoinbase.vin[0].scriptSig = (CScript() << chainActive.Height()+1 << CScriptNum(blockinfo[i].extranonce)) + COINBASE_FLAGS;
-            txCoinbase.vout.resize(1); // Ignore the (optional) segwit commitment added by CreateNewBlock (as the hardcoded nonces don't account for this)
-            txCoinbase.vout[0].scriptPubKey = CScript();
-            pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
-            if (txFirst.size() == 0)
+            block.nTime = std::max<int64_t>(
+                chainActive.Tip()->GetBlockTime() + chainparams.GetConsensus().nPowTargetSpacing * 3,
+                chainActive.Tip()->GetMedianTimePast() + 1);
+            block.nBits = GetNextWorkRequired(chainActive.Tip(), &block, block.GetAlgo(), chainparams.GetConsensus());
+            block.nNonce = 0;
+            while (!CheckProofOfWork(block.GetPoWHash(block.GetAlgo(), chainparams.GetConsensus()), block.GetAlgo(), block.nBits, chainparams.GetConsensus())) {
+                ++block.nNonce;
+            }
+            if (i == 1) {
                 baseheight = chainActive.Height();
-            if (txFirst.size() < 4)
-                txFirst.push_back(pblock->vtx[0]);
-            pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
-            pblock->nNonce = blockinfo[i].nonce;
+            }
+            if (i >= 1 && txFirst.size() < 4) {
+                txFirst.push_back(block.vtx[0]);
+            }
+            CValidationState state;
+            BOOST_REQUIRE_MESSAGE(TestBlockValidity(state, chainparams, block, chainActive.Tip(), false, false), FormatStateMessage(state));
         }
-        std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
-        BOOST_CHECK(ProcessNewBlock(chainparams, shared_pblock, true, nullptr));
-        pblock->hashPrevBlock = pblock->GetHash();
+        std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(block);
+        BOOST_REQUIRE_MESSAGE(ProcessNewBlock(chainparams, shared_pblock, true, nullptr), block.GetHash().ToString());
     }
 
     LOCK(cs_main);
+    entry.nHeight = chainActive.Height();
 
     // Just to make sure we can still make simple blocks
     BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey, ALGO_SHA256D));
 
-    const CAmount BLOCKSUBSIDY = 1000*COIN;
+    const CAmount BLOCKSUBSIDY = txFirst[0]->vout[0].nValue;
     const CAmount LOWFEE = CENT;
     const CAmount HIGHFEE = COIN;
     const CAmount HIGHERFEE = 4*COIN;

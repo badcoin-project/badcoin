@@ -117,8 +117,8 @@ BOOST_AUTO_TEST_CASE(rpc_rawsign)
     r = CallRPC(std::string("createrawtransaction ")+prevout+" "+
       "{\"MQ3Jx2krKJbDgAcxJrXvL73KXH4zVf8mWg\":11}");
     std::string notsigned = r.get_str();
-    std::string privkey1 = "\"TPs4Zfq8VCtw6xKAAo48m88Tb2kVtqYrFRxNfeYpddmSai8A9ELk\"";
-    std::string privkey2 = "\"TNhAF9Mt59EpnZJVomKozaSpcEn7AEcsR3Jqija8tjhsopHepTTS\"";
+    std::string privkey1 = "\"Cu3GXrWyL97TcF1syNNck4rjCT4a5pycJ8ubq8bYWjugzGbzYWoP\"";
+    std::string privkey2 = "\"CssNDL3iv5TMHr1DcLeHyXB6Df6BME3dTkG4tDcrmqr8DNkY5GtR\"";
     r = CallRPC(std::string("signrawtransaction ")+notsigned+" "+prevout+" "+"[]");
     BOOST_CHECK(find_value(r.get_obj(), "complete").get_bool() == false);
     r = CallRPC(std::string("signrawtransaction ")+notsigned+" "+prevout+" "+"["+privkey1+","+privkey2+"]");
