@@ -217,7 +217,9 @@ BOOST_AUTO_TEST_CASE(processnewblock_signals_ordering)
 
     UnregisterValidationInterface(&sub);
 
-    BOOST_CHECK_MESSAGE(failures.empty(), failures.empty() ? "" : "valid block was not processed: " + failures.front());
+    if (!failures.empty()) {
+        BOOST_ERROR("valid block was not processed: " + failures.front());
+    }
     BOOST_CHECK_EQUAL(sub.m_expected_tip, chainActive.Tip()->GetBlockHash());
 }
 
