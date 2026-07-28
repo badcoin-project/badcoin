@@ -95,6 +95,16 @@ jobs:
           set -eux
           make check
 
+      - name: Upload Linux unit-test failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-unit-test-failure-logs
+          path: |
+            src/test-suite.log
+            src/test/test_badcoin.log
+          if-no-files-found: warn
+
       - name: Run focused functional tests
         run: |
           set -eux
