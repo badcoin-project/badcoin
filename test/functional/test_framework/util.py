@@ -21,6 +21,10 @@ from .authproxy import AuthServiceProxy, JSONRPCException
 
 logger = logging.getLogger("TestFramework.utils")
 
+BADCOIN_REGTEST_TARGET_SPACING = 60
+BADCOIN_REGTEST_MIN_DIFFICULTY_SPACING = 2 * BADCOIN_REGTEST_TARGET_SPACING
+BADCOIN_COINBASE_MATURITY = 100
+
 # Assert functions
 ##################
 
@@ -417,6 +421,41 @@ def sync_mempools(rpc_connections, *, wait=1, timeout=60, flush_scheduler=True):
 
 # Transaction/Block functions
 #############################
+
+def badcoin_regtest_generate(node, nblocks, *, maxtries=1000000, ensure_mature=False):
+    """Mine Badcoin regtest blocks with deterministic timestamps.
+
+    Badcoin regtest keeps the upstream generate RPC but selects a Badcoin
+    multi-algo block template and applies regtest min-difficulty timing. Mine
+    one block per RPC so short nonce-search failures are visible and bounded,
+    while advancing mock time enough to stay on the existing regtest rules.
+    """
+    if nblocks < 0:
+        raise ValueError("nblocks must be non-negative")
+
+    total_blocks = nblocks + (BADCOIN_COINBASE_MATURITY if ensure_mature else 0)
+    generated = []
+    try:
+        for _ in range(total_blocks):
+            start_height = node.getblockcount()
+            tip_time = node.getblock(node.getbestblockhash())["time"]
+            block_time = tip_time + BADCOIN_REGTEST_MIN_DIFFICULTY_SPACING + 1
+            node.setmocktime(block_time)
+
+            block_hashes = node.generate(1, maxtries)
+            if len(block_hashes) != 1:
+                raise AssertionError(
+                    "Badcoin regtest mining failed at height {} after {} tries".format(
+                        start_height + 1, maxtries))
+
+            assert_equal(node.getblockcount(), start_height + 1)
+            assert_equal(node.getbestblockhash(), block_hashes[0])
+            generated.extend(block_hashes)
+    finally:
+        node.setmocktime(0)
+
+    assert_equal(len(generated), total_blocks)
+    return generated[:nblocks]
 
 def find_output(node, txid, amount):
     """

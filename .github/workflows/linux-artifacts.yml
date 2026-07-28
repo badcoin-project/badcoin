@@ -61,7 +61,6 @@ jobs:
             --disable-ccache \
             --disable-maintainer-mode \
             --disable-dependency-tracking \
-            --disable-tests \
             --disable-bench \
             --without-gui || {
               status=$?
@@ -90,6 +89,16 @@ jobs:
         run: |
           set -eux
           make ${MAKEJOBS}
+
+      - name: Run unit tests
+        run: |
+          set -eux
+          make check
+
+      - name: Run focused functional tests
+        run: |
+          set -eux
+          test/functional/test_runner.py feature_datacarrier.py p2p_message_size.py
 
       - name: Stage Linux artifacts
         run: |
