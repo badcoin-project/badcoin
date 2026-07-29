@@ -232,6 +232,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
                 chainActive.Tip()->GetBlockTime() + chainparams.GetConsensus().nPowTargetSpacing * 3,
                 chainActive.Tip()->GetMedianTimePast() + 1);
             block.nBits = GetNextWorkRequired(chainActive.Tip(), &block, block.GetAlgo(), chainparams.GetConsensus());
+            block.hashMerkleRoot = BlockMerkleRoot(block);
             block.nNonce = 0;
             while (!CheckProofOfWork(block.GetPoWHash(block.GetAlgo(), chainparams.GetConsensus()), block.GetAlgo(), block.nBits, chainparams.GetConsensus())) {
                 ++block.nNonce;
