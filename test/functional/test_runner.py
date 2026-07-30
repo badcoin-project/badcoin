@@ -100,6 +100,7 @@ BASE_SCRIPTS= [
     'feature_proxy.py',
     'rpc_signrawtransaction.py',
     'p2p_disconnect_ban.py',
+    'p2p_message_size.py',
     'rpc_decodescript.py',
     'rpc_blockchain.py',
     'rpc_deprecated.py',
@@ -133,6 +134,7 @@ BASE_SCRIPTS= [
     'feature_logging.py',
     'p2p_node_network_limited.py',
     'feature_config_args.py',
+    'feature_datacarrier.py',
     'feature_help.py',
     # Don't append tests at the end to avoid merge conflicts
     # Put them in a random line within the section that fits their approximate run-time

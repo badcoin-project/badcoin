@@ -718,15 +718,58 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = CScript() << OP_1;
     BOOST_CHECK(!IsStandardTx(t, reason));
 
-    // MAX_OP_RETURN_RELAY-byte TX_NULL_DATA (standard)
-    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
+    // Helper: one canonical OP_RETURN push of the given payload length.
+    // For payloads >= 256 bytes the script size is 4 + payload
+    // (OP_RETURN + OP_PUSHDATA2 + 2-byte length + payload).
+    auto MakeDataCarrier = [](size_t payload_len) {
+        std::vector<unsigned char> data(payload_len, 0x11);
+        return CScript() << OP_RETURN << data;
+    };
+
+    // 512-byte payload -> 516-byte script (new default MAX_OP_RETURN_RELAY) -> standard
+    t.vout[0].scriptPubKey = MakeDataCarrier(512);
+    BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY, 516u);
+    BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), 516u);
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY, t.vout[0].scriptPubKey.size());
     BOOST_CHECK(IsStandardTx(t, reason));
 
-    // MAX_OP_RETURN_RELAY+1-byte TX_NULL_DATA (non-standard)
-    t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3804678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef3800");
+    // 513-byte payload -> 517-byte script -> non-standard
+    t.vout[0].scriptPubKey = MakeDataCarrier(513);
+    BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), 517u);
     BOOST_CHECK_EQUAL(MAX_OP_RETURN_RELAY + 1, t.vout[0].scriptPubKey.size());
     BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK_EQUAL(reason, "scriptpubkey");
+
+    // Guard against the historical "512 means script bytes" mistake:
+    // a 508-byte payload produces a 512-byte script and must still be standard
+    // under the new 516 default (it would have been the old max if 512 were the ceiling).
+    t.vout[0].scriptPubKey = MakeDataCarrier(508);
+    BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), 512u);
+    BOOST_CHECK(IsStandardTx(t, reason));
+
+    // Historical Bitcoin Core ceiling (80 payload / 83 script) remains reachable
+    // by lowering nMaxDatacarrierBytes; restore the default afterward.
+    {
+        const unsigned int prev_max = nMaxDatacarrierBytes;
+        nMaxDatacarrierBytes = 83;
+        t.vout[0].scriptPubKey = MakeDataCarrier(80);
+        BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), 83u);
+        BOOST_CHECK(IsStandardTx(t, reason));
+        t.vout[0].scriptPubKey = MakeDataCarrier(81);
+        BOOST_CHECK_EQUAL(t.vout[0].scriptPubKey.size(), 84u);
+        BOOST_CHECK(!IsStandardTx(t, reason));
+        nMaxDatacarrierBytes = prev_max;
+    }
+
+    // -datacarrier=0 / fAcceptDatacarrier=false rejects otherwise-valid null data
+    {
+        const bool prev_accept = fAcceptDatacarrier;
+        fAcceptDatacarrier = false;
+        t.vout[0].scriptPubKey = MakeDataCarrier(512);
+        BOOST_CHECK(!IsStandardTx(t, reason));
+        BOOST_CHECK_EQUAL(reason, "scriptpubkey");
+        fAcceptDatacarrier = prev_accept;
+    }
 
     // Data payload can be encoded in any way...
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("");
@@ -753,14 +796,17 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
     BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK_EQUAL(reason, "multi-op-return");
 
     t.vout[0].scriptPubKey = CScript() << OP_RETURN << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38");
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
     BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK_EQUAL(reason, "multi-op-return");
 
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
     BOOST_CHECK(!IsStandardTx(t, reason));
+    BOOST_CHECK_EQUAL(reason, "multi-op-return");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

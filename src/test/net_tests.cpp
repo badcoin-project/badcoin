@@ -187,4 +187,23 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test)
     BOOST_CHECK(pnode2->fFeeler == false);
 }
 
+
+BOOST_AUTO_TEST_CASE(max_protocol_message_length)
+{
+    // Issue #1: lowered from the inherited Namecoin 32 MiB default.
+    BOOST_CHECK_EQUAL(MAX_PROTOCOL_MESSAGE_LENGTH, 8u * 1024u * 1024u);
+
+    // Measured BadCoin mainnet max 2,000-header window (2026-07-17).
+    BOOST_CHECK_LT(178723u, MAX_PROTOCOL_MESSAGE_LENGTH);
+
+    // Conservative synthetic planning case: 2,000 headers * 4 KiB.
+    BOOST_CHECK_LT(2000u * 4096u, MAX_PROTOCOL_MESSAGE_LENGTH);
+
+    // Still above Bitcoin's 4 MiB until auxpow coinbase size is bounded.
+    BOOST_CHECK_GT(MAX_PROTOCOL_MESSAGE_LENGTH, 4u * 1024u * 1024u);
+
+    // Receive path rejects strictly greater than the cap.
+    BOOST_CHECK(MAX_PROTOCOL_MESSAGE_LENGTH + 1u > MAX_PROTOCOL_MESSAGE_LENGTH);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
