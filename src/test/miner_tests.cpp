@@ -237,10 +237,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
             while (!CheckProofOfWork(block.GetPoWHash(block.GetAlgo(), chainparams.GetConsensus()), block.GetAlgo(), block.nBits, chainparams.GetConsensus())) {
                 ++block.nNonce;
             }
-            if (i == 1) {
+            if (i == 0) {
                 baseheight = chainActive.Height();
             }
-            if (i >= 1 && txFirst.size() < 4) {
+            if (txFirst.size() < 4) {
                 txFirst.push_back(block.vtx[0]);
             }
             CValidationState state;
