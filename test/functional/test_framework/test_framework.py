@@ -21,13 +21,13 @@ from .util import (
     MAX_NODES,
     PortSeed,
     assert_equal,
+    badcoin_regtest_generate,
     check_json_precision,
     connect_nodes_bi,
     disconnect_nodes,
     get_datadir_path,
     initialize_datadir,
     p2p_port,
-    set_node_times,
     sync_blocks,
     sync_mempools,
 )
@@ -404,24 +404,16 @@ class BitcoinTestFramework():
             # gets 25 mature blocks and 25 immature.
             # Note: To preserve compatibility with older versions of
             # initialize_chain, only 4 nodes will generate coins.
-            #
-            # blocks are created with timestamps 10 minutes apart
-            # starting from 2010 minutes in the past
-            self.enable_mocktime()
-            block_time = self.mocktime - (201 * 10 * 60)
             for i in range(2):
                 for peer in range(4):
                     for j in range(25):
-                        set_node_times(self.nodes, block_time)
-                        self.nodes[peer].generate(1)
-                        block_time += 10 * 60
+                        badcoin_regtest_generate(self.nodes[peer], 1)
                     # Must sync before next peer starts generating blocks
                     sync_blocks(self.nodes)
 
             # Shut them down, and clean up cache directories:
             self.stop_nodes()
             self.nodes = []
-            self.disable_mocktime()
 
             def cache_path(n, *paths):
                 return os.path.join(get_datadir_path(self.options.cachedir, n), "regtest", *paths)
