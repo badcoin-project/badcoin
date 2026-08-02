@@ -374,9 +374,11 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup)
     // Cap last block file size, and mine new block in a new block file.
     CBlockIndex* const nullBlock = nullptr;
     CBlockIndex* oldTip = chainActive.Tip();
+    const CAmount oldTipCoinbase = coinbaseTxns.back().vout[0].nValue;
     GetBlockFileInfo(oldTip->GetBlockPos().nFile)->nSize = MAX_BLOCKFILE_SIZE;
-    CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+    CBlock newBlock = CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     CBlockIndex* newTip = chainActive.Tip();
+    const CAmount newTipCoinbase = newBlock.vtx[0]->vout[0].nValue;
 
     LOCK(cs_main);
 
@@ -388,7 +390,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup)
         WalletRescanReserver reserver(&wallet);
         reserver.reserve();
         BOOST_CHECK_EQUAL(nullBlock, wallet.ScanForWalletTransactions(oldTip, nullptr, reserver));
-        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 2000 * COIN);
+        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), oldTipCoinbase + newTipCoinbase);
     }
 
     // Prune the older block file.
@@ -403,7 +405,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChain100Setup)
         WalletRescanReserver reserver(&wallet);
         reserver.reserve();
         BOOST_CHECK_EQUAL(oldTip, wallet.ScanForWalletTransactions(oldTip, nullptr, reserver));
-        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), 1000 * COIN);
+        BOOST_CHECK_EQUAL(wallet.GetImmatureBalance(), newTipCoinbase);
     }
 
     // Verify importmulti RPC returns failure for a key whose creation time is
@@ -531,7 +533,7 @@ BOOST_FIXTURE_TEST_CASE(coin_mark_dirty_immature_credit, TestChain100Setup)
     // credit amount is calculated.
     wtx.MarkDirty();
     wallet.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
-    BOOST_CHECK_EQUAL(wtx.GetImmatureCredit(), 1000*COIN);
+    BOOST_CHECK_EQUAL(wtx.GetImmatureCredit(), coinbaseTxns.back().vout[0].nValue);
 }
 
 static int64_t AddTx(CWallet& wallet, uint32_t lockTime, int64_t mockTime, int64_t blockTime)
@@ -667,7 +669,7 @@ BOOST_FIXTURE_TEST_CASE(ListCoins, ListCoinsTestingSetup)
     BOOST_CHECK_EQUAL(list.begin()->second.size(), 1);
 
     // Check initial balance from one mature coinbase transaction.
-    BOOST_CHECK_EQUAL(1000 * COIN, wallet->GetAvailableBalance());
+    BOOST_CHECK_EQUAL(coinbaseTxns.front().vout[0].nValue, wallet->GetAvailableBalance());
 
     // Add a transaction creating a change address, and confirm ListCoins still
     // returns the coin associated with the change address underneath the

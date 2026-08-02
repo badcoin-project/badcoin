@@ -16,14 +16,14 @@
 
 #include <boost/test/unit_test.hpp>
 
-static const std::string strSecret1 = "6z8tDFZ9cJy8CWVAZiHawKM7DbhDdCpnQEyLDNUwMz4LBvqDSzb";
-static const std::string strSecret2 = "6zLeARdm3LVHKX1QEx6B1Ks936mWrZNfRJydmpXwhYEqsgg3YGW";
-static const std::string strSecret1C = "TRBo35EtzrJimo9KDPECnjykSc8WioBuPafdobpJwcqhgpdQaQCf";
-static const std::string strSecret2C = "TS5h2bjFPK1q2jSmaa9qASGJUGTUmjtcaJLyJpoaRvt6iRvg2k73";
-static const std::string addr1 = "MX7aKiuxRxQ4UnaseF41GzxBuWqHJ2GUwy";
-static const std::string addr2 = "MEBPbnApwv5fetLH7eVvaxPNUY8WV9d8jD";
-static const std::string addr1C = "MBeR1CLYqGPoonVC18AAywEuho3MeGFSwP";
-static const std::string addr2C = "MTpDtfFCDBi9nJ3kmZJPavhw65j62D3p86";
+static const std::string strSecret1 = "3hdvvXa26cgvz7Y3iuTfTtbDURLqvCEyHc2nJh55wmQKpwywEut";
+static const std::string strSecret2 = "3hqgshedXeD6784HQ9GFXu7FHvR99YnrJg35s986HKaqWn3q3zv";
+static const std::string strSecret1C = "CvN11FvjqnXFH5r31xYgmgi242SauncfSHcry5s2piyx6P9TDSCc";
+static const std::string strSecret2C = "CwFtznR6EFEMY29VP9UK9Nza5gmYxjKNd1JCUJrJK32M7zRzJA5y";
+static const std::string addr1 = "CfgJfLMcozCnVFWy71izcExt4RAXbCtaCi";
+static const std::string addr2 = "CNk7wPcVKwtPfMGNaRAuvCQ4dSTkuRu9rx";
+static const std::string addr1C = "CLD9LonDDJCXpFRHTtqAKBFbrhNbwZ4NEB";
+static const std::string addr2C = "CcNxEGgrbDWsnkyrEKyNvAidEz4LS6gxZo";
 
 static const std::string strAddressBad = "1HV9Lc3sNHZxwj4Zk6fB38tEmBryq2cBiF";
 

@@ -249,21 +249,39 @@ BOOST_AUTO_TEST_CASE(versionbits_test)
 BOOST_AUTO_TEST_CASE(versionbits_computeblockversion)
 {
     // Check that ComputeBlockVersion will set the appropriate bit correctly
-    // on mainnet.
+    // using Badcoin's mainnet deployment parameters. Mainnet TESTDUMMY is
+    // always active, so use a local finite TESTDUMMY deployment for these
+    // state-transition checks.
     const auto chainParams = CreateChainParams(CBaseChainParams::MAIN);
     const Consensus::Params &mainnetParams = chainParams->GetConsensus();
+    BOOST_CHECK_EQUAL(mainnetParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime, Consensus::BIP9Deployment::ALWAYS_ACTIVE);
 
-    // Use the TESTDUMMY deployment for testing purposes.
-    int64_t bit = mainnetParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit;
-    int64_t nStartTime = mainnetParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime;
-    int64_t nTimeout = mainnetParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout;
+    Consensus::Params testParams = mainnetParams;
+    const int64_t bit = testParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit;
+    const int period = testParams.nMinerConfirmationWindow;
+    const int threshold = testParams.nRuleChangeActivationThreshold;
+    const int64_t spacing = testParams.nPowTargetSpacing;
+    const int64_t genesisTime = 1415926536;
+    auto deployment_time = [genesisTime, spacing](int height) {
+        return genesisTime + spacing * height;
+    };
+    testParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = deployment_time(3 * period);
+    testParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = deployment_time(6 * period);
 
-    assert(nStartTime < nTimeout);
+    const int64_t nStartTime = testParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime;
+    const int64_t nTimeout = testParams.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout;
+    const uint32_t testBit = VersionBitsMask(testParams, Consensus::DEPLOYMENT_TESTDUMMY);
 
     // In the first chain, test that the bit is set by CBV until it has failed.
     // In the second chain, test the bit is set by CBV while STARTED and
     // LOCKED-IN, and then no longer set while ACTIVE.
     VersionBitsTester firstChain, secondChain;
+    VersionBitsCache testCache;
+    testCache.Clear();
+    {
+        LOCK(cs_main);
+        versionbitscache.Clear();
+    }
 
     // Start generating blocks before nStartTime
     int64_t nTime = nStartTime - 1;
@@ -271,79 +289,87 @@ BOOST_AUTO_TEST_CASE(versionbits_computeblockversion)
     // Before MedianTimePast of the chain has crossed nStartTime, the bit
     // should not be set.
     CBlockIndex *lastBlock = nullptr;
-    lastBlock = firstChain.Mine(2016, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit), 0);
+    lastBlock = firstChain.Mine(period, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
+    BOOST_CHECK_EQUAL(VersionBitsState(lastBlock, testParams, Consensus::DEPLOYMENT_TESTDUMMY, testCache), THRESHOLD_DEFINED);
+    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, testParams) & testBit, 0);
 
-    // Mine 2011 more blocks at the old time, and check that CBV isn't setting the bit yet.
-    for (int i=1; i<2012; i++) {
-        lastBlock = firstChain.Mine(2016+i, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-        // This works because VERSIONBITS_LAST_OLD_BLOCK_VERSION happens
-        // to be 4, and the bit we're testing happens to be bit 28.
-        BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit), 0);
-    }
-    // Now mine 5 more blocks at the start time -- MTP should not have passed yet, so
-    // CBV should still not yet set the bit.
+    // Mine another period at the old time, and check that CBV isn't setting the bit yet.
+    lastBlock = firstChain.Mine(2 * period, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
+    BOOST_CHECK_EQUAL(VersionBitsState(lastBlock, testParams, Consensus::DEPLOYMENT_TESTDUMMY, testCache), THRESHOLD_DEFINED);
+    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, testParams) & testBit, 0);
+
+    // Now mine at the start time so the next period transitions to STARTED.
     nTime = nStartTime;
-    for (int i=2012; i<=2016; i++) {
-        lastBlock = firstChain.Mine(2016+i, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-        BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit), 0);
-    }
-
-    // Advance to the next period and transition to STARTED,
-    lastBlock = firstChain.Mine(6048, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-    // so ComputeBlockVersion should now set the bit,
-    BOOST_CHECK((ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit)) != 0);
+    lastBlock = firstChain.Mine(3 * period, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
+    BOOST_CHECK_EQUAL(VersionBitsState(lastBlock, testParams, Consensus::DEPLOYMENT_TESTDUMMY, testCache), THRESHOLD_STARTED);
+    BOOST_CHECK((ComputeBlockVersion(lastBlock, testParams) & testBit) != 0);
     // and should also be using the VERSIONBITS_TOP_BITS.
-    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, mainnetParams) & VERSIONBITS_TOP_MASK, VERSIONBITS_TOP_BITS);
+    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, testParams) & VERSIONBITS_TOP_MASK, VERSIONBITS_TOP_BITS);
 
     // Check that ComputeBlockVersion will set the bit until nTimeout
-    nTime += 600;
-    int blocksToMine = 4032; // test blocks for up to 2 time periods
-    int nHeight = 6048;
+    nTime += spacing;
+    int blocksToMine = 2 * period;
+    int nHeight = 3 * period;
     // These blocks are all before nTimeout is reached.
     while (nTime < nTimeout && blocksToMine > 0) {
         lastBlock = firstChain.Mine(nHeight+1, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-        BOOST_CHECK((ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit)) != 0);
-        BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, mainnetParams) & VERSIONBITS_TOP_MASK, VERSIONBITS_TOP_BITS);
+        BOOST_CHECK((ComputeBlockVersion(lastBlock, testParams) & testBit) != 0);
+        BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, testParams) & VERSIONBITS_TOP_MASK, VERSIONBITS_TOP_BITS);
         blocksToMine--;
-        nTime += 600;
+        nTime += spacing;
         nHeight += 1;
     }
 
     nTime = nTimeout;
     // FAILED is only triggered at the end of a period, so CBV should be setting
     // the bit until the period transition.
-    for (int i=0; i<2015; i++) {
+    for (int i=0; i<period - 1; i++) {
         lastBlock = firstChain.Mine(nHeight+1, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-        BOOST_CHECK((ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit)) != 0);
+        BOOST_CHECK((ComputeBlockVersion(lastBlock, testParams) & testBit) != 0);
         nHeight += 1;
     }
     // The next block should trigger no longer setting the bit.
     lastBlock = firstChain.Mine(nHeight+1, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit), 0);
+    BOOST_CHECK_EQUAL(VersionBitsState(lastBlock, testParams, Consensus::DEPLOYMENT_TESTDUMMY, testCache), THRESHOLD_FAILED);
+    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, testParams) & testBit, 0);
 
     // On a new chain:
     // verify that the bit will be set after lock-in, and then stop being set
     // after activation.
     nTime = nStartTime;
+    testCache.Clear();
+    {
+        LOCK(cs_main);
+        versionbitscache.Clear();
+    }
 
     // Mine one period worth of blocks, and check that the bit will be on for the
     // next period.
-    lastBlock = secondChain.Mine(2016, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-    BOOST_CHECK((ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit)) != 0);
+    lastBlock = secondChain.Mine(period, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
+    BOOST_CHECK_EQUAL(VersionBitsState(lastBlock, testParams, Consensus::DEPLOYMENT_TESTDUMMY, testCache), THRESHOLD_STARTED);
+    BOOST_CHECK((ComputeBlockVersion(lastBlock, testParams) & testBit) != 0);
 
     // Mine another period worth of blocks, signaling the new bit.
-    lastBlock = secondChain.Mine(4032, nTime, VERSIONBITS_TOP_BITS | (1<<bit)).Tip();
+    lastBlock = secondChain.Mine(2 * period, nTime, VERSIONBITS_TOP_BITS | testBit).Tip();
     // After one period of setting the bit on each block, it should have locked in.
     // We keep setting the bit for one more period though, until activation.
-    BOOST_CHECK((ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit)) != 0);
+    BOOST_CHECK_EQUAL(VersionBitsState(lastBlock, testParams, Consensus::DEPLOYMENT_TESTDUMMY, testCache), THRESHOLD_LOCKED_IN);
+    BOOST_CHECK((ComputeBlockVersion(lastBlock, testParams) & testBit) != 0);
+    BIP9Stats stats = VersionBitsStatistics(lastBlock, testParams, Consensus::DEPLOYMENT_TESTDUMMY);
+    BOOST_CHECK_EQUAL(stats.period, period);
+    BOOST_CHECK_EQUAL(stats.threshold, threshold);
 
     // Now check that we keep mining the block until the end of this period, and
     // then stop at the beginning of the next period.
-    lastBlock = secondChain.Mine(6047, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-    BOOST_CHECK((ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit)) != 0);
-    lastBlock = secondChain.Mine(6048, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
-    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, mainnetParams) & (1<<bit), 0);
+    lastBlock = secondChain.Mine(3 * period - 1, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
+    BOOST_CHECK((ComputeBlockVersion(lastBlock, testParams) & testBit) != 0);
+    lastBlock = secondChain.Mine(3 * period, nTime, VERSIONBITS_LAST_OLD_BLOCK_VERSION).Tip();
+    BOOST_CHECK_EQUAL(VersionBitsState(lastBlock, testParams, Consensus::DEPLOYMENT_TESTDUMMY, testCache), THRESHOLD_ACTIVE);
+    BOOST_CHECK_EQUAL(ComputeBlockVersion(lastBlock, testParams) & testBit, 0);
+    {
+        LOCK(cs_main);
+        versionbitscache.Clear();
+    }
 
     // Finally, verify that after a soft fork has activated, CBV no longer uses
     // VERSIONBITS_LAST_OLD_BLOCK_VERSION.

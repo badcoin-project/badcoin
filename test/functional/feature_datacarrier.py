@@ -13,6 +13,7 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
     assert_raises_rpc_error,
+    badcoin_regtest_generate,
     connect_nodes_bi,
     sync_blocks,
 )
@@ -54,12 +55,13 @@ class DataCarrierTest(BitcoinTestFramework):
         return signed["hex"]
 
     def run_test(self):
-        self.nodes[0].generate(110)
+        connect_nodes_bi(self.nodes, 0, 2)
+        badcoin_regtest_generate(self.nodes[0], 10, ensure_mature=True)
         sync_blocks(self.nodes)
 
         for n in (1, 2):
             self.nodes[0].sendtoaddress(self.nodes[n].getnewaddress(), 25)
-        self.nodes[0].generate(1)
+        badcoin_regtest_generate(self.nodes[0], 1)
         sync_blocks(self.nodes)
 
         self.log.info("New default accepts a 512-byte payload (516-byte script)")
@@ -88,7 +90,7 @@ class DataCarrierTest(BitcoinTestFramework):
         sync_blocks(self.nodes)
         if self.nodes[1].getbalance() < 1:
             self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 10)
-            self.nodes[0].generate(1)
+            badcoin_regtest_generate(self.nodes[0], 1)
             sync_blocks(self.nodes)
         tx_disabled = self.create_funded_data_tx(self.nodes[1], 80)
         assert_raises_rpc_error(-26, "scriptpubkey", self.nodes[1].sendrawtransaction, tx_disabled)
@@ -103,14 +105,14 @@ class DataCarrierTest(BitcoinTestFramework):
         self.log.info("Restrictive node rejects 512-byte tx from mempool but accepts it in a block")
         if self.nodes[2].getbalance() < 1:
             self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 10)
-            self.nodes[0].generate(1)
+            badcoin_regtest_generate(self.nodes[0], 1)
             sync_blocks(self.nodes)
         tx_512_perm = self.create_funded_data_tx(self.nodes[2], 512)
         txid_perm = self.nodes[2].sendrawtransaction(tx_512_perm)
         assert txid_perm in self.nodes[2].getrawmempool()
         assert_raises_rpc_error(-26, "scriptpubkey", self.nodes[1].sendrawtransaction, tx_512_perm)
 
-        blockhash = self.nodes[2].generate(1)[0]
+        blockhash = badcoin_regtest_generate(self.nodes[2], 1)[0]
         sync_blocks(self.nodes)
         block = self.nodes[1].getblock(blockhash)
         assert txid_perm in block["tx"]
