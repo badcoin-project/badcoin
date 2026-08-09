@@ -2301,21 +2301,22 @@ void static UpdateTip(const CBlockIndex *pindexNew, const CChainParams& chainPar
                 }
             }
         }
-        // Check the version of the last 100 blocks to see if we need to upgrade:
+        // Check the version of the last 100 blocks to see if BIP9 top bits
+        // are being used in an unexpected way. Badcoin encodes chain/algo
+        // metadata and miner-controlled rolling data in the remaining version
+        // bits, so those fields must not be treated as unknown consensus rules.
         for (int i = 0; i < 100 && pindex != nullptr; i++)
         {
-            int32_t nExpectedVersion = ComputeBlockVersion(pindex->pprev, chainParams.GetConsensus());
-            /* Badcoin: we only use the lowest 8 bits for BIP9, so we mask the chainid and algo (0x00FFFF00)*/
-            //if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && (pindex->nVersion & ~nExpectedVersion) != 0)
-            if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && ((pindex->nVersion & ~nExpectedVersion) & 0xFF0000FF) != 0)
+            if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION &&
+                (pindex->nVersion & VERSIONBITS_TOP_MASK) != VERSIONBITS_TOP_BITS)
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            warningMessages.push_back(strprintf(_("%d of last 100 blocks have unexpected version"), nUpgraded));
+            warningMessages.push_back(strprintf(_("%d of last 100 blocks have unexpected version top bits"), nUpgraded));
         if (nUpgraded > 100/2)
         {
-            std::string strWarning = _("Warning: Unknown block versions being mined! It's possible unknown rules are in effect");
+            std::string strWarning = _("Warning: unexpected block version top bits are being mined");
             // notify GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
             DoWarning(strWarning);
         }
