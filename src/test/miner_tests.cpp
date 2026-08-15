@@ -237,10 +237,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
             while (!CheckProofOfWork(block.GetPoWHash(block.GetAlgo(), chainparams.GetConsensus()), block.GetAlgo(), block.nBits, chainparams.GetConsensus())) {
                 ++block.nNonce;
             }
-            if (i == 1) {
+            if (i == 0) {
                 baseheight = chainActive.Height();
             }
-            if (i >= 1 && txFirst.size() < 4) {
+            if (txFirst.size() < 4) {
                 txFirst.push_back(block.vtx[0]);
             }
             CValidationState state;
@@ -265,7 +265,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     // Just to make sure we can still make simple blocks
     BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey, ALGO_SHA256D));
 
-    const CAmount BLOCKSUBSIDY = txFirst[0]->vout[0].nValue;
+    const CAmount BLOCKSUBSIDY = txFirst[1]->vout[0].nValue;
     const CAmount LOWFEE = CENT;
     const CAmount HIGHFEE = COIN;
     const CAmount HIGHERFEE = 4*COIN;

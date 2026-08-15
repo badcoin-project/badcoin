@@ -55,6 +55,7 @@ class DataCarrierTest(BitcoinTestFramework):
         return signed["hex"]
 
     def run_test(self):
+        connect_nodes_bi(self.nodes, 0, 2)
         badcoin_regtest_generate(self.nodes[0], 10, ensure_mature=True)
         sync_blocks(self.nodes)
 
