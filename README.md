@@ -1,105 +1,124 @@
-Badcoin Core – Community Integration / Staging Tree
+# Badcoin Core
+
 Project repository: https://github.com/badcoin-project/badcoin
 
-Badcoin Core is the reference implementation of the revived Badcoin multi-algorithm blockchain. It connects to the Badcoin peer-to-peer network to validate blocks and transactions and optionally provides a wallet and graphical user interface.
+Badcoin Core is the reference implementation of the Badcoin multi-algorithm blockchain. It is maintained by the badcoin-project community and connects to the Badcoin peer-to-peer network to validate blocks and transactions. It also provides command-line tools and an optional graphical wallet.
 
-Background
+## Background
 
 Badcoin has existed in two prior forms:
 
-Badcoin (2017) – A BitShares-issued token, not a standalone blockchain.
+- **Badcoin (2017)** – A BitShares-issued token, not a standalone blockchain.
+- **Badcoin (2018)** – A multi-algorithm Proof-of-Work blockchain launched as part of a promotional project by the Bad Crypto Podcast. Although development and chain activity later declined, the community preserved the source code and existing blockchain.
 
-Badcoin (2018) – A multi-algorithm Proof-of-Work blockchain launched as part of a promotional project by the Bad Crypto Podcast. Although the chain later became inactive, the community preserved the source code.
+## Original Developer Acknowledgment
 
-Original Developer Acknowledgment
+The 2018 Badcoin blockchain implementation was originally developed by an independent contributor known as ScriptProdigy. Although the original maintainer is no longer active in the ecosystem, their work remains the foundation on which the current modernized implementation is built. This project continues forward as a community-maintained effort.
 
-The 2018 Badcoin blockchain implementation was originally developed by an independent contributor known as ScriptProdigy. Although the original maintainer is no longer active in the ecosystem, their work served as the foundation on which this revived and modernized version is built. This project continues forward as a community-driven effort.
+## Badcoin Core Modernization
 
-Badcoin Revival Project (2025–present)
+This repository contains the independently maintained modernization of the existing Badcoin blockchain implementation. The project is not affiliated with the original podcast creators or the original developer. Their initial contributions remain part of Badcoin’s history, while current development focuses on maintaining and improving the existing network and software.
 
-This repository represents a fully independent, community-maintained modernization of the 2018 Badcoin blockchain. The project is not affiliated with the original podcast creators or the original developer. We acknowledge their initial contributions as part of Badcoin’s early history, but this effort is focused on long-term development, maintenance, and sustainability.
+## Badcoin Core v1.0.0.0
 
-About This Release – v0.1.0 (Pre-Release)
+Badcoin Core v1.0.0.0 is the first modernized Core release maintained by badcoin-project.
 
-This version marks the first pre-release of the revived Badcoin project. It prepares the codebase for a new testnet and lays the foundation for future development.
+This release continues the existing Badcoin blockchain. It is not a new chain launch and does not replace the existing chain history or balances.
 
-This release includes:
+The release includes:
 
-Updated build system
+- Updated Linux and Windows build workflows.
+- A restored and qualified unit-test baseline.
+- Badcoin-specific focused functional tests.
+- Updated networking and standard transaction relay policies.
+- Updated project and release documentation.
 
-Removal of outdated or incorrect branding
+Before replacing an older Badcoin wallet download:
 
-Initial cleanup of legacy Bitcoin/Myriad components
+1. Back up the wallet data.
+2. Completely shut down the existing wallet.
+3. Store the backup in a separate, secure location.
+4. Verify the new download and its published checksum before running it.
 
-Early documentation rebuilding
+Official downloads will be published through the repository’s GitHub Releases page:
 
-Preparation for restored unit and functional testing
+https://github.com/badcoin-project/badcoin/releases
 
-v0.1.0 is not a stable or production-ready release. Breaking changes should be expected during active modernization.
+Old wallet and download links should be replaced with the v1.0.0.0 release link after the release is published. Development builds and workflow artifacts should not be treated as final wallet releases.
 
-Mining Algorithms
+## Mining Algorithms
 
 Badcoin uses five independent Proof-of-Work algorithms:
 
-SHA256d
+- SHA256d
+- Scrypt
+- Groestl
+- Skein
+- Yescrypt
 
-Scrypt
+These are encoded directly into block `nVersion` bits. Relevant logic appears in `src/primitives/pureheader.h` and the associated proof-of-work selection code.
 
-Groestl
-
-Skein
-
-Yescrypt
-
-These are encoded directly into block nVersion bits. Relevant logic appears in src/primitives/pureheader.h and associated PoW selection code.
-
-License
+## License
 
 Badcoin Core is released under the MIT License.
-See the file COPYING or https://opensource.org/licenses/MIT
 
-Building Badcoin Core
+See `COPYING` or https://opensource.org/licenses/MIT.
+
+## Building Badcoin Core
 
 Basic Linux build:
 
+```bash
 ./autogen.sh
 ./configure
 make -j$(nproc)
+```
 
 Run on testnet:
 
+```bash
 ./src/badcoind -testnet
+```
 
-More detailed build instructions will be added as modernization continues.
+Run the unit-test suite:
 
-Development Process
+```bash
+make check
+```
 
-Development is coordinated through GitHub pull requests:
+Run the focused functional tests:
+
+```bash
+test/functional/feature_datacarrier.py
+test/functional/p2p_message_size.py
+```
+
+Additional platform-specific build instructions are available in the `doc/` directory.
+
+## Development Process
+
+Development is coordinated through GitHub issues and pull requests:
+
 https://github.com/badcoin-project/badcoin
 
-The main branch serves as the primary development branch and may not always be stable. Release tags will be created periodically to mark stable builds.
+The `development` branch is the primary integration branch and may not always be stable. Stable releases are prepared through dedicated release branches and identified by release tags.
 
-Documentation Status
+Contributors should include appropriate tests with new or modified code. Consensus behavior should not be changed solely to satisfy tests inherited from upstream projects.
 
-The original Badcoin documentation inherited from Bitcoin and Myriad was outdated or incorrect, and much of it has been removed during modernization. Documentation is actively being rebuilt.
+## Documentation
 
-Currently:
+Repository documentation is available in the `doc/` directory. Some technical documents retain upstream terminology where it accurately describes inherited code or compatible tooling.
 
-Some files in the doc/ directory are incomplete or placeholders
+Additional Badcoin project documentation is available at:
 
-Manpages have been removed and will be regenerated in a future release
-
-RPC documentation reflects pre-modernization behavior
-
-Wallet and developer documentation are under reconstruction
-
-Updated documentation will be published at:
 https://badcoin.dev
 
-Testing
+## Testing
 
-Unit tests and functional tests are being restored as part of the modernization effort. Contributors are encouraged to include tests with new or modified code. Legacy test scaffolding may not currently execute without updates.
+Badcoin Core includes unit tests and functional tests adapted to its existing formats, multi-algorithm proof-of-work behavior, relay policies, and networking behavior.
 
-Translations
+Changes should include appropriate test coverage and should preserve Badcoin-specific behavior rather than assuming Bitcoin defaults.
 
-Translation management currently follows the upstream Bitcoin Core workflow. Updated policies will be introduced later in the revival process.
+## Translations
+
+Translation files and tooling currently follow the inherited upstream workflow where applicable.
