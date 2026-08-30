@@ -1,82 +1,71 @@
-Bitcoin Core
-=============
+# Badcoin Core Documentation
 
-Setup
----------------------
-Bitcoin Core is the original Bitcoin client and it builds the backbone of the network. It downloads and, by default, stores the entire history of Bitcoin transactions (which is currently more than 100 GBs); depending on the speed of your computer and network connection, the synchronization process can take anywhere from a few hours to a day or more.
+This directory contains build, development, operation, and release documentation for Badcoin Core.
 
-To download Bitcoin Core, visit [bitcoincore.org](https://bitcoincore.org/en/releases/).
+Badcoin Core is the reference implementation of the existing Badcoin multi-algorithm blockchain. Official releases are published at:
 
-Running
----------------------
-The following are some helpful notes on how to run Bitcoin on your native platform.
+https://github.com/badcoin-project/badcoin/releases
 
-### Unix
+Development builds and workflow artifacts should not be treated as final wallet releases.
 
-Unpack the files into a directory and run:
+## Running Badcoin Core
 
-- `bin/bitcoin-qt` (GUI) or
-- `bin/bitcoind` (headless)
+After extracting a release archive, use the appropriate Badcoin executable:
+
+### Unix-like systems
+
+- `badcoin-qt` — graphical wallet and node
+- `badcoind` — headless node
+- `badcoin-cli` — RPC command-line client
+- `badcoin-tx` — transaction utility
 
 ### Windows
 
-Unpack the files into a directory, and then run bitcoin-qt.exe.
+- `badcoin-qt.exe` — graphical wallet and node
+- `badcoind.exe` — headless node
+- `badcoin-cli.exe` — RPC command-line client
+- `badcoin-tx.exe` — transaction utility
 
-### OS X
+Before replacing an older wallet download, back up the wallet data, completely shut down the existing wallet, and verify the new download against its published checksum.
 
-Drag Bitcoin-Core to your applications folder, and then run Bitcoin-Core.
+## Building
 
-### Need Help?
-
-* See the documentation at the [Bitcoin Wiki](https://en.bitcoin.it/wiki/Main_Page)
-for help and more information.
-* Ask for help on [#bitcoin](http://webchat.freenode.net?channels=bitcoin) on Freenode. If you don't have an IRC client use [webchat here](http://webchat.freenode.net?channels=bitcoin).
-* Ask for help on the [BitcoinTalk](https://bitcointalk.org/) forums, in the [Technical Support board](https://bitcointalk.org/index.php?board=4.0).
-
-Building
----------------------
-The following are developer notes on how to build Bitcoin on your native platform. They are not complete guides, but include notes on the necessary libraries, compile flags, etc.
+Platform-specific build notes include:
 
 - [Dependencies](dependencies.md)
-- [OS X Build Notes](build-osx.md)
+- [macOS Build Notes](build-osx.md)
 - [Unix Build Notes](build-unix.md)
 - [Windows Build Notes](build-windows.md)
+- [NetBSD Build Notes](build-netbsd.md)
 - [OpenBSD Build Notes](build-openbsd.md)
-- [Gitian Building Guide](gitian-building.md)
 
-Development
----------------------
-The Bitcoin repo's [root README](/README.md) contains relevant information on the development process and automated testing.
+These inherited build guides may describe older operating-system or dependency versions. Confirm dependencies before relying on them for a release build.
+
+## Development and Release Documentation
 
 - [Developer Notes](developer-notes.md)
 - [Release Notes](release-notes.md)
 - [Release Process](release-process.md)
-- [Source Code Documentation (External Link)](https://dev.visucore.com/bitcoin/doxygen/)
-- [Translation Process](translation_process.md)
-- [Translation Strings Policy](translation_strings_policy.md)
-- [Travis CI](travis-ci.md)
 - [Unauthenticated REST Interface](REST-interface.md)
 - [Shared Libraries](shared-libraries.md)
-- [BIPS](bips.md)
-- [Dnsseed Policy](dnsseed-policy.md)
+- [DNS Seed Policy](dnsseed-policy.md)
 - [Benchmarking](benchmarking.md)
+- [Fuzz Testing](fuzzing.md)
+- [Translation Process](translation_process.md)
+- [Translation Strings Policy](translation_strings_policy.md)
 
-### Resources
-* Discuss on the [BitcoinTalk](https://bitcointalk.org/) forums, in the [Development & Technical Discussion board](https://bitcointalk.org/index.php?board=6.0).
-* Discuss project-specific development on #bitcoin-core-dev on Freenode. If you don't have an IRC client use [webchat here](http://webchat.freenode.net/?channels=bitcoin-core-dev).
-* Discuss general Bitcoin development on #bitcoin-dev on Freenode. If you don't have an IRC client use [webchat here](http://webchat.freenode.net/?channels=bitcoin-dev).
+Some technical documents retain upstream Bitcoin Core terminology or links where they accurately explain inherited code, interfaces, or compatibility requirements. Those references do not identify this repository as Bitcoin Core.
 
-### Miscellaneous
-- [Assets Attribution](assets-attribution.md)
-- [Files](files.md)
-- [Fuzz-testing](fuzzing.md)
-- [Reduce Traffic](reduce-traffic.md)
-- [Tor Support](tor.md)
-- [Init Scripts (systemd/upstart/openrc)](init.md)
-- [ZMQ](zmq.md)
+## Additional Documentation
 
-License
----------------------
-Distributed under the [MIT software license](/COPYING).
-This product includes software developed by the OpenSSL Project for use in the [OpenSSL Toolkit](https://www.openssl.org/). This product includes
-cryptographic software written by Eric Young ([eay@cryptsoft.com](mailto:eay@cryptsoft.com)), and UPnP software written by Thomas Bernard.
+Additional Badcoin project information is available at:
+
+https://badcoin.dev
+
+Development is coordinated through the Badcoin repository:
+
+https://github.com/badcoin-project/badcoin
+
+## License
+
+Badcoin Core is distributed under the [MIT software license](../COPYING).
