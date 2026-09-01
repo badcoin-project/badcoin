@@ -81,9 +81,9 @@ Examples:
     Qt: Add feed bump button
     Trivial: Fix typo in init.cpp
 
-Note that translations should not be submitted as pull requests, please see
-[Translation Process](https://github.com/bitcoin/bitcoin/blob/master/doc/translation_process.md) 
-for more information on helping with translations.
+Translations are not currently maintained through a dedicated Badcoin Core
+translation process. Please open an issue before starting translation work so the
+project can coordinate the scope and avoid duplicated effort.
 
 If a pull request is not to be considered for merging (yet), please
 prefix the title with [WIP] or use [Tasks Lists](https://help.github.com/articles/basic-writing-and-formatting-syntax/#task-lists)
