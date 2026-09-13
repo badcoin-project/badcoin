@@ -223,7 +223,7 @@ jobs:
           $daemon = Start-Process -FilePath (Join-Path $PWD 'badcoind.exe') -ArgumentList "-datadir=$testDir" -WorkingDirectory $PWD -PassThru -WindowStyle Hidden
           try {
             Start-Sleep -Seconds 10
-            $infoText = & .\badcoin-cli.exe -datadir=$testDir -rpcuser=badcoin-ci -rpcpassword=badcoin-ci-test getblockchaininfo 2>&1
+            $infoText = & .\badcoin-cli.exe "-datadir=$testDir" '-rpcuser=badcoin-ci' '-rpcpassword=badcoin-ci-test' getblockchaininfo 2>&1
             if ($LASTEXITCODE -ne 0) {
               throw "getblockchaininfo failed: $infoText"
             }
@@ -233,7 +233,7 @@ jobs:
             }
             Write-Host "RPC chain: $($info.chain)"
             Write-Host "RPC blocks: $($info.blocks)"
-            & .\badcoin-cli.exe -datadir=$testDir -rpcuser=badcoin-ci -rpcpassword=badcoin-ci-test stop
+            & .\badcoin-cli.exe "-datadir=$testDir" '-rpcuser=badcoin-ci' '-rpcpassword=badcoin-ci-test' stop
             if ($LASTEXITCODE -ne 0) {
               throw 'RPC stop failed'
             }
