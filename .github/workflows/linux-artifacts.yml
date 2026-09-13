@@ -147,6 +147,7 @@ jobs:
         working-directory: artifact
         run: |
           sha256sum -c SHA256SUMS.txt
+          chmod +x badcoind badcoin-cli badcoin-tx
           test -x badcoind
           test -x badcoin-cli
           test -x badcoin-tx
