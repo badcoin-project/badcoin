@@ -130,3 +130,67 @@ jobs:
           path: artifacts/linux-x64-core/
           if-no-files-found: error
           retention-days: 14
+
+  linux-smoke:
+    name: Linux x64 core smoke test
+    needs: linux-build
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Download Linux core artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: badcoin-linux-x64-core
+          path: artifact
+
+      - name: Verify Linux core artifact
+        working-directory: artifact
+        run: |
+          sha256sum -c SHA256SUMS.txt
+          chmod +x badcoind badcoin-cli badcoin-tx
+          test -x badcoind
+          test -x badcoin-cli
+          test -x badcoin-tx
+
+      - name: Smoke-test Linux core binaries
+        working-directory: artifact
+        run: |
+          ./badcoind --version
+          ./badcoin-cli --version
+          ./badcoin-tx --help
+
+      - name: Smoke-test Linux daemon and RPC
+        working-directory: artifact
+        run: |
+          TESTDIR="$RUNNER_TEMP/badcoin-linux-core-smoke"
+          mkdir -p "$TESTDIR"
+
+          ./badcoind \
+            -datadir="$TESTDIR" \
+            -server=1 \
+            -listen=0 \
+            -dnsseed=0 \
+            -connect=0 \
+            -rpcuser=badcoin-ci \
+            -rpcpassword=badcoin-ci-test \
+            >"$TESTDIR/badcoind.log" 2>&1 &
+          DAEMON_PID=$!
+
+          sleep 5
+          ./badcoin-cli -datadir="$TESTDIR" -rpcuser=badcoin-ci -rpcpassword=badcoin-ci-test getblockchaininfo
+          ./badcoin-cli -datadir="$TESTDIR" -rpcuser=badcoin-ci -rpcpassword=badcoin-ci-test stop
+
+          sleep 3
+          if kill -0 "$DAEMON_PID" 2>/dev/null; then
+            kill "$DAEMON_PID"
+          fi
+
+      - name: Upload Linux smoke logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-linux-smoke-logs
+          path: |
+            \${{ runner.temp }}/badcoin-linux-core-smoke/badcoind.log
+          if-no-files-found: warn
+          retention-days: 14

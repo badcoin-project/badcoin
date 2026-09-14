@@ -140,3 +140,116 @@ jobs:
           path: artifacts/windows-x64-${{ matrix.variant }}/
           if-no-files-found: error
           retention-days: 14
+
+  windows-core-smoke:
+    name: Windows x64 core smoke test
+    needs: windows-build
+    runs-on: windows-latest
+
+    steps:
+      - name: Download Windows core artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: badcoin-windows-x64-core
+          path: artifact
+
+      - name: Verify Windows core artifact
+        shell: pwsh
+        working-directory: artifact
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $checksums = Get-Content .\SHA256SUMS.txt
+          foreach ($line in $checksums) {
+            if ($line -notmatch '^([0-9a-fA-F]{64})\s+[* ](.+)$') {
+              throw "Invalid checksum line: $line"
+            }
+            $expected = $Matches[1].ToLowerInvariant()
+            $file = $Matches[2]
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant()
+            if ($actual -ne $expected) {
+              throw "Checksum mismatch: $file"
+            }
+            Write-Host ($file + ': OK')
+          }
+          foreach ($file in @('badcoind.exe', 'badcoin-cli.exe', 'badcoin-tx.exe')) {
+            if (-not (Test-Path -LiteralPath $file)) {
+              throw "Missing binary: $file"
+            }
+          }
+
+      - name: Smoke-test Windows core binaries and metadata
+        shell: pwsh
+        working-directory: artifact
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $daemonVersion = (& .\badcoind.exe --version 2>&1 | Out-String)
+          $cliVersion = (& .\badcoin-cli.exe --version 2>&1 | Out-String)
+          $txHelp = (& .\badcoin-tx.exe --help 2>&1 | Out-String)
+          if ($daemonVersion -notmatch 'Badcoin Core Daemon version') {
+            throw 'badcoind version identity check failed'
+          }
+          if ($cliVersion -notmatch 'Badcoin Core RPC client version') {
+            throw 'badcoin-cli version identity check failed'
+          }
+          if ($txHelp -notmatch 'Badcoin Core badcoin-tx utility version') {
+            throw 'badcoin-tx help/version identity check failed'
+          }
+          foreach ($file in @('badcoind.exe', 'badcoin-cli.exe', 'badcoin-tx.exe')) {
+            $version = (Get-Item -LiteralPath $file).VersionInfo
+            if ($version.ProductVersion -notmatch '^1\.0\.0\.0') {
+              throw ("Unexpected ProductVersion for {0}: {1}" -f $file, $version.ProductVersion)
+            }
+            if ($version.OriginalFilename -ne $file) {
+              throw "Unexpected OriginalFilename for $file"
+            }
+          }
+
+      - name: Smoke-test Windows daemon and RPC
+        shell: pwsh
+        working-directory: artifact
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $testDir = Join-Path $env:RUNNER_TEMP 'badcoin-windows-core-smoke'
+          New-Item -ItemType Directory -Force -Path $testDir | Out-Null
+          @'
+          server=1
+          rpcuser=badcoin-ci
+          rpcpassword=badcoin-ci-test
+          rpcallowip=127.0.0.1
+          listen=0
+          dnsseed=0
+          connect=0
+          '@ | Set-Content -Encoding ascii (Join-Path $testDir 'badcoin.conf')
+          $daemon = Start-Process -FilePath (Join-Path $PWD 'badcoind.exe') -ArgumentList "-datadir=$testDir" -WorkingDirectory $PWD -PassThru -WindowStyle Hidden
+          try {
+            Start-Sleep -Seconds 10
+            $infoText = & .\badcoin-cli.exe "-datadir=$testDir" '-rpcuser=badcoin-ci' '-rpcpassword=badcoin-ci-test' getblockchaininfo 2>&1
+            if ($LASTEXITCODE -ne 0) {
+              throw "getblockchaininfo failed: $infoText"
+            }
+            $info = $infoText | ConvertFrom-Json
+            if (-not $info.chain) {
+              throw 'RPC response did not contain chain'
+            }
+            Write-Host "RPC chain: $($info.chain)"
+            Write-Host "RPC blocks: $($info.blocks)"
+            & .\badcoin-cli.exe "-datadir=$testDir" '-rpcuser=badcoin-ci' '-rpcpassword=badcoin-ci-test' stop
+            if ($LASTEXITCODE -ne 0) {
+              throw 'RPC stop failed'
+            }
+            $daemon.WaitForExit(15000)
+          }
+          finally {
+            if (-not $daemon.HasExited) {
+              Stop-Process -Id $daemon.Id -Force
+            }
+          }
+
+      - name: Upload Windows smoke logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-windows-core-smoke-logs
+          path: \${{ runner.temp }}/badcoin-windows-core-smoke
+          if-no-files-found: warn
+          retention-days: 14
