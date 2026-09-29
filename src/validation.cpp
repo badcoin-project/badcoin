@@ -1215,6 +1215,34 @@ bool ReadBlockHeaderFromDisk(CBlockHeader& block, const CBlockIndex* pindex, con
     return ReadBlockOrHeader(block, pindex, consensusParams);
 }
 
+/*
+ * CONSENSUS-CRITICAL FLOATING POINT. Do not remove the pragma below.
+ *
+ * This function decides the block subsidy in `double`, which means the
+ * compiler's freedom to fuse a multiply and an add changes consensus. On
+ * 2026-09-19 a node built from this tree stopped at height 238,446 with
+ *
+ *     coinbase pays too much (actual=210759533405 vs limit=210759533404)
+ *
+ * one unit apart. Measured cause: the last statement,
+ * `nSubsidy -= (nSubsidy * (multipl - 1.0))`, is the pattern `a - b*c`. arm64
+ * always has an FMA instruction, so clang contracts it by default and rounds
+ * once. Baseline x86-64 has no FMA instruction, so it cannot contract and
+ * rounds twice. At that block the exact value sits 1.55e-5 above an integer
+ * boundary where the spacing of doubles is 3.05e-5, so the two roundings land
+ * on opposite sides:
+ *
+ *     two roundings, x86-64 : 210759533405   <- what the network mined
+ *     one rounding, arm64   : 210759533404   <- what an arm64 build computes
+ *
+ * The chain was mined by non-contracting nodes, so the two-rounding result is
+ * consensus whether or not it is the more accurate one. The pragma pins that
+ * behaviour on every architecture.
+ *
+ * This is a workaround, not a repair. The real repair is integer arithmetic in
+ * the subsidy, which is a consensus change and cannot be made unilaterally.
+ */
+#pragma clang fp contract(off)
 CAmount GetBlockSubsidy(int nHeight, int nBits, const Consensus::Params& consensusParams)
 {
     if (nHeight == 1)
