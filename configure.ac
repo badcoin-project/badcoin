@@ -264,13 +264,6 @@ if test "x$CXXFLAGS_overridden" = "xno"; then
   AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough],[CXXFLAGS="$CXXFLAGS -Wno-implicit-fallthrough"],,[[$CXXFLAG_WERROR]])
 fi
 
-## Consensus: GetBlockSubsidy computes the subsidy in double. Floating-point
-## contraction (fusing a*b+c into one FMA) changes that result on arm64, and a
-## contracting build forks at block 238,446. Keep contraction off for every
-## compiler, even when CXXFLAGS is overridden. src/validation.cpp also carries
-## "#pragma clang fp contract(off)", which only clang honours.
-AX_CHECK_COMPILE_FLAG([-ffp-contract=off],[CXXFLAGS="$CXXFLAGS -ffp-contract=off"],,[[$CXXFLAG_WERROR]])
-
 # Check for optional instruction set support. Enabling these does _not_ imply that all code will
 # be compiled with them, rather that specific objects/libs may use them after checking for runtime
 # compatibility.
