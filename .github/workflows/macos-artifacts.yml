@@ -31,7 +31,11 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          brew install automake libtool pkg-config cmake python3
+          brew install automake libtool pkg-config cmake python3 python-setuptools
+          echo "$(brew --prefix python)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix python)/libexec/bin" >> "$GITHUB_PATH"
+          python --version
+          python -c "import setuptools; print(setuptools.__version__)"
 
       - name: Build depends
         run: |
