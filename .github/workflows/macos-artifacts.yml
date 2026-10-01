@@ -47,6 +47,15 @@ jobs:
         run: |
           make -C depends ${MAKEJOBS}
 
+      - name: Show Boost bootstrap diagnostics
+        if: failure()
+        run: |
+          find depends/work -name bootstrap.log -print
+          for log in $(find depends/work -name bootstrap.log); do
+            echo "--- ${log} ---"
+            tail -n 120 "${log}"
+          done
+
       - name: Configure
         run: |
           ./autogen.sh
