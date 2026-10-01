@@ -32,8 +32,14 @@ jobs:
       - name: Install build dependencies
         run: |
           brew install automake libtool pkg-config cmake python3 python-setuptools
-          echo "$(brew --prefix python)/bin" >> "$GITHUB_PATH"
-          echo "$(brew --prefix python)/libexec/bin" >> "$GITHUB_PATH"
+          PYTHON_PREFIX="$(brew --prefix python)"
+          PYTHON_VERSION="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+          PYTHON_SITE="$(brew --prefix)/lib/python${PYTHON_VERSION}/site-packages"
+          export PATH="${PYTHON_PREFIX}/libexec/bin:${PYTHON_PREFIX}/bin:${PATH}"
+          export PYTHONPATH="${PYTHON_SITE}${PYTHONPATH:+:${PYTHONPATH}}"
+          echo "${PYTHON_PREFIX}/libexec/bin" >> "${GITHUB_PATH}"
+          echo "${PYTHON_PREFIX}/bin" >> "${GITHUB_PATH}"
+          echo "PYTHONPATH=${PYTHONPATH}" >> "${GITHUB_ENV}"
           python --version
           python -c "import setuptools; print(setuptools.__version__)"
 
