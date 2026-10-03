@@ -25,11 +25,11 @@ $(package)_cxxflags_linux=-fPIC
 endef
 
 define $(package)_preprocess_cmds
-  echo "using $(boost_toolset_$(host_os)) : : $($(package)_cxx) : <cxxflags>\"$($(package)_cxxflags) $($(package)_cppflags)\" <linkflags>\"$($(package)_ldflags)\" <archiver>\"$(boost_archiver_$(host_os))\" <striper>\"$(host_STRIP)\"  <ranlib>\"$(host_RANLIB)\" <rc>\"$(host_WINDRES)\" : ;" > user-config.jam
+  echo "using $(boost_toolset_$(host_os)) : : $($(package)_cxx) : <cxxflags>\"$($(package)_cxxflags) $($(package)_cppflags)\" <linkflags>\"$($(package)_ldflags)\" <archiver>\"$(boost_archiver_$(host_os))\" <striper>\"$(host_STRIP)\"  <ranlib>\"$(host_RANLIB)\" <rc>\"$(host_WINDRES)\" : ;" > user-config.jam && if test "$(host_os)" = darwin; then perl -0pi -e 's{darwin\)(\s+)BOOST_JAM_CC=cc}{darwin)\x0A    BOOST_JAM_CC="cc -Wno-error=implicit-function-declaration"}' tools/build/src/engine/build.sh && perl -0pi -e 's{toolset darwin cc\s+:\s+"-o "\s+:\s+-D\s*:}{toolset darwin cc :  "-o " : -D\x0A    : -Wno-error=implicit-function-declaration}' tools/build/src/engine/build.jam; fi
 endef
 
 define $(package)_config_cmds
-  CFLAGS="-Wno-error=implicit-function-declaration" ./bootstrap.sh --without-icu --with-libraries=$(boost_config_libraries)
+  ./bootstrap.sh --without-icu --with-libraries=$(boost_config_libraries)
 endef
 
 define $(package)_build_cmds
