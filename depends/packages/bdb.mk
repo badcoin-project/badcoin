@@ -10,11 +10,11 @@ $(package)_config_opts=--disable-shared --enable-cxx --disable-replication
 $(package)_config_opts_mingw32=--enable-mingw
 $(package)_config_opts_linux=--with-pic
 $(package)_config_opts_darwin=--enable-posixmutexes
-$(package)_cflags_darwin=-Wno-error=implicit-function-declaration
 $(package)_cxxflags=-std=c++11
 endef
 
 define $(package)_preprocess_cmds
+  if test "$(host_os)" = darwin; then sed -i.old '/# POSIX.1 pthreads:/,/unable to find POSIX 1003.1 mutex interfaces/ s/exit (/return (/' dist/configure; fi && \
   sed -i.old 's/__atomic_compare_exchange/__atomic_compare_exchange_db/' dbinc/atomic.h && \
   sed -i.old 's/atomic_init/atomic_init_db/' dbinc/atomic.h mp/mp_region.c mp/mp_mvcc.c mp/mp_fget.c mutex/mut_method.c mutex/mut_tas.c && \
   cp -f $(BASEDIR)/config.guess $(BASEDIR)/config.sub dist
