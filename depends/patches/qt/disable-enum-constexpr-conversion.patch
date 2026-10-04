@@ -1,6 +1,9 @@
 --- a/qtbase/src/corelib/global/qtypetraits.h
 +++ b/qtbase/src/corelib/global/qtypetraits.h
-@@ -481,4 +481,11 @@ struct not_c
+@@ -478,11 +478,18 @@ struct not_c
+ struct not_c
+     : integral_constant<bool, !B> {};
+
  // Checks whether a type is unsigned (T must be convertible to unsigned int):
 +#if defined(__clang__)
 +#  pragma clang diagnostic push
@@ -12,3 +15,7 @@
 +#if defined(__clang__)
 +#  pragma clang diagnostic pop
 +#endif
+
+ // Checks whether a type is signed (T must be convertible to int):
+ template <typename T>
+ struct is_signed

@@ -144,7 +144,7 @@ define $(package)_preprocess_cmds
   patch -p1 < $($(package)_patch_dir)/fix_qt_pkgconfig.patch && \
   patch -p1 < $($(package)_patch_dir)/fix-cocoahelpers-macos.patch && \
   patch -p1 < $($(package)_patch_dir)/qfixed-coretext.patch && \
-  if test "$(host_os)" = darwin; then patch -p1 < $($(package)_patch_dir)/disable-enum-constexpr-conversion.patch; fi && \
+  if test "$(host_os)" = darwin; then git apply $($(package)_patch_dir)/disable-enum-constexpr-conversion.patch; fi && \
   echo "!host_build: QMAKE_CFLAGS     += $($(package)_cflags) $($(package)_cppflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
   echo "!host_build: QMAKE_CXXFLAGS   += $($(package)_cxxflags) $($(package)_cppflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
   echo "!host_build: QMAKE_LFLAGS     += $($(package)_ldflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
