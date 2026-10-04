@@ -1,6 +1,6 @@
 --- a/qtbase/src/corelib/global/qtypetraits.h
 +++ b/qtbase/src/corelib/global/qtypetraits.h
-@@ -481,6 +481,14 @@ struct not_c
+@@ -481,4 +481,11 @@ struct not_c
  // Checks whether a type is unsigned (T must be convertible to unsigned int):
 +#if defined(__clang__)
 +#  pragma clang diagnostic push
