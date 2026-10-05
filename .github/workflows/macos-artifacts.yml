@@ -67,7 +67,7 @@ jobs:
               --disable-dependency-tracking \
               --disable-bench \
               --with-gui=qt5; then
-            tail -n 240 config.log
+            grep -n -B 40 -A 100 -- '-lqminimal' config.log || tail -n 500 config.log
             exit 1
           fi
 
