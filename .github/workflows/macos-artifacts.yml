@@ -60,13 +60,16 @@ jobs:
         run: |
           ./autogen.sh
           HOST="$(./depends/config.guess)"
-          CONFIG_SITE="$PWD/depends/${HOST}/share/config.site" ./configure \
-            --prefix=/ \
-            --disable-ccache \
-            --disable-maintainer-mode \
-            --disable-dependency-tracking \
-            --disable-bench \
-            --with-gui=qt5
+          if ! CONFIG_SITE="$PWD/depends/${HOST}/share/config.site" ./configure \
+              --prefix=/ \
+              --disable-ccache \
+              --disable-maintainer-mode \
+              --disable-dependency-tracking \
+              --disable-bench \
+              --with-gui=qt5; then
+            tail -n 240 config.log
+            exit 1
+          fi
 
       - name: Build
         run: |
