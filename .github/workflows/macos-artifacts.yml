@@ -60,7 +60,8 @@ jobs:
         run: |
           ./autogen.sh
           HOST="$(./depends/config.guess)"
-          if ! CONFIG_SITE="$PWD/depends/${HOST}/share/config.site" ./configure \
+          if ! CXXFLAGS="-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION" \
+              CONFIG_SITE="$PWD/depends/${HOST}/share/config.site" ./configure \
               --prefix=/ \
               --disable-ccache \
               --disable-maintainer-mode \
