@@ -67,6 +67,7 @@ jobs:
               --disable-dependency-tracking \
               --disable-bench \
               --with-gui=qt5; then
+            grep -n -B 10 -A 200 -- 'Boost::Thread library is available' config.log || true
             grep -n -B 40 -A 100 -- '-lqminimal' config.log || tail -n 500 config.log
             exit 1
           fi
