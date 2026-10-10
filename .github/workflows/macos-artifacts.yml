@@ -84,8 +84,32 @@ jobs:
           make ${MAKEJOBS}
 
       - name: Run unit tests
+        id: unit_tests
         run: |
           make check
+
+      - name: Show macOS unit-test failure logs
+        if: ${{ failure() && steps.unit_tests.conclusion == 'failure' }}
+        run: |
+          for log in src/test-suite.log src/test/test_badcoin.log src/qt/test/test_badcoin-qt.log; do
+            if [ -f "$log" ]; then
+              echo "::group::${log}"
+              tail -n 250 "$log"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Upload macOS unit-test failure logs
+        if: ${{ failure() && steps.unit_tests.conclusion == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-macos-arm64-unit-test-logs
+          path: |
+            src/test-suite.log
+            src/test/*.log
+            src/qt/test/*.log
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Run focused functional tests
         run: |
