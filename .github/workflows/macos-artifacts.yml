@@ -1,0 +1,225 @@
+name: macOS artifact build
+
+"on":
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - development
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-build:
+    name: macOS arm64 core and Qt
+    runs-on: macos-14
+
+    env:
+      MAKEJOBS: "-j2"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          brew install automake libtool pkg-config cmake python3 python-setuptools
+          PYTHON_PREFIX="$(brew --prefix python)"
+          PYTHON_VERSION="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+          PYTHON_SITE="$(brew --prefix)/lib/python${PYTHON_VERSION}/site-packages"
+          export PATH="${PYTHON_PREFIX}/libexec/bin:${PYTHON_PREFIX}/bin:${PATH}"
+          export PYTHONPATH="${PYTHON_SITE}${PYTHONPATH:+:${PYTHONPATH}}"
+          echo "${PYTHON_PREFIX}/libexec/bin" >> "${GITHUB_PATH}"
+          echo "${PYTHON_PREFIX}/bin" >> "${GITHUB_PATH}"
+          echo "PYTHONPATH=${PYTHONPATH}" >> "${GITHUB_ENV}"
+          python --version
+          python -c "import setuptools; print(setuptools.__version__)"
+
+      - name: Build depends
+        run: |
+          make -C depends ${MAKEJOBS}
+
+      - name: Show Boost bootstrap diagnostics
+        if: failure()
+        run: |
+          find depends/work -name bootstrap.log -print
+          for log in $(find depends/work -name bootstrap.log); do
+            echo "--- ${log} ---"
+            tail -n 120 "${log}"
+          done
+
+      - name: Configure
+        run: |
+          # The unit-test target hardcodes x86 SSE2 flags; use its generic scrypt path on arm64.
+          sed -i '' 's/ -DUSE_SSE2 -msse2//g' src/Makefile.test.include
+          if grep -En -- '-DUSE_SSE2|-msse2' src/Makefile.test.include; then
+            echo "x86 SSE2 test flags remain on the arm64 build"
+            exit 1
+          fi
+          ./autogen.sh
+          HOST="$(./depends/config.guess)"
+          if ! CXXFLAGS="-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION" \
+              CONFIG_SITE="$PWD/depends/${HOST}/share/config.site" ./configure \
+              --prefix=/ \
+              --disable-ccache \
+              --disable-maintainer-mode \
+              --disable-dependency-tracking \
+              --disable-bench \
+              --with-gui=qt5; then
+            grep -n -B 10 -A 200 -- 'Boost::Thread library is available' config.log || true
+            grep -n -B 40 -A 100 -- '-lqminimal' config.log || tail -n 500 config.log
+            exit 1
+          fi
+
+      - name: Build
+        run: |
+          make ${MAKEJOBS}
+
+      - name: Run unit tests
+        id: unit_tests
+        run: |
+          make check
+
+      - name: Show macOS unit-test failure logs
+        if: ${{ failure() && steps.unit_tests.conclusion == 'failure' }}
+        run: |
+          for log in src/test-suite.log src/test/test_badcoin.log src/qt/test/test_badcoin-qt.log; do
+            if [ -f "$log" ]; then
+              echo "::group::${log}"
+              tail -n 250 "$log"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Upload macOS unit-test failure logs
+        if: ${{ failure() && steps.unit_tests.conclusion == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-macos-arm64-unit-test-logs
+          path: |
+            src/test-suite.log
+            src/test/*.log
+            src/qt/test/*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Run focused functional tests
+        run: |
+          test/functional/test_runner.py feature_datacarrier.py p2p_message_size.py
+
+      - name: Stage macOS core artifact
+        run: |
+          mkdir -p artifacts/macos-arm64-core
+          cp -v src/badcoind artifacts/macos-arm64-core/
+          cp -v src/badcoin-cli artifacts/macos-arm64-core/
+          cp -v src/badcoin-tx artifacts/macos-arm64-core/
+          cd artifacts/macos-arm64-core
+          shasum -a 256 badcoind badcoin-cli badcoin-tx > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Stage macOS Qt artifact
+        run: |
+          mkdir -p artifacts/macos-arm64-qt
+          cp -v src/badcoind artifacts/macos-arm64-qt/
+          cp -v src/badcoin-cli artifacts/macos-arm64-qt/
+          cp -v src/badcoin-tx artifacts/macos-arm64-qt/
+          cp -v src/qt/badcoin-qt artifacts/macos-arm64-qt/
+          cd artifacts/macos-arm64-qt
+          shasum -a 256 badcoind badcoin-cli badcoin-tx badcoin-qt > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload macOS core artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-macos-arm64-core
+          path: artifacts/macos-arm64-core/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload macOS Qt artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-macos-arm64-qt
+          path: artifacts/macos-arm64-qt/
+          if-no-files-found: error
+          retention-days: 14
+
+  macos-smoke:
+    name: macOS arm64 smoke test
+    needs: macos-build
+    runs-on: macos-14
+
+    steps:
+      - name: Download core artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: badcoin-macos-arm64-core
+          path: core
+
+      - name: Download Qt artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: badcoin-macos-arm64-qt
+          path: qt
+
+      - name: Verify checksums and executables
+        run: |
+          (cd core && shasum -a 256 -c SHA256SUMS.txt)
+          (cd qt && shasum -a 256 -c SHA256SUMS.txt)
+          test -x core/badcoind
+          test -x core/badcoin-cli
+          test -x core/badcoin-tx
+          test -x qt/badcoin-qt
+
+      - name: Smoke-test versions and Qt launch
+        run: |
+          core/badcoind --version
+          core/badcoin-cli --version
+          core/badcoin-tx --help
+          QT_QPA_PLATFORM=offscreen qt/badcoin-qt -help >/tmp/badcoin-qt-help.txt 2>&1 || true
+          grep -E "Badcoin|badcoin-qt" /tmp/badcoin-qt-help.txt
+
+      - name: Smoke-test daemon and RPC
+        run: |
+          TESTDIR="$RUNNER_TEMP/badcoin-macos-core-smoke"
+          mkdir -p "$TESTDIR"
+          core/badcoind \
+            -datadir="$TESTDIR" \
+            -server=1 \
+            -listen=0 \
+            -dnsseed=0 \
+            -connect=0 \
+            -rpcuser=badcoin-ci \
+            -rpcpassword=badcoin-ci-test \
+            >"$TESTDIR/badcoind.log" 2>&1 &
+          DAEMON_PID=$!
+          sleep 5
+          core/badcoin-cli \
+            -datadir="$TESTDIR" \
+            -rpcuser=badcoin-ci \
+            -rpcpassword=badcoin-ci-test \
+            getblockchaininfo
+          core/badcoin-cli \
+            -datadir="$TESTDIR" \
+            -rpcuser=badcoin-ci \
+            -rpcpassword=badcoin-ci-test \
+            stop
+          sleep 3
+          kill -0 "$DAEMON_PID" 2>/dev/null && kill "$DAEMON_PID" || true
+
+      - name: Upload macOS smoke logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-macos-smoke-logs
+          path: ${{ runner.temp }}/badcoin-macos-core-smoke
+          if-no-files-found: warn
+          retention-days: 14
