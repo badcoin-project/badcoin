@@ -30,6 +30,7 @@
 #include <QTextEdit>
 #include <QListView>
 #include <QDialogButtonBox>
+#include <QDebug>
 
 namespace
 {
@@ -155,10 +156,12 @@ void TestGUI()
     g_change_type = OUTPUT_TYPE_P2SH_SEGWIT;
 
     // Set up wallet and chain with 105 blocks (5 mature blocks for spending).
+    qInfo() << "WalletTests: creating test chain";
     TestChain100Setup test;
     for (int i = 0; i < 5; ++i) {
         test.CreateAndProcessBlock({}, GetScriptForRawPubKey(test.coinbaseKey.GetPubKey()));
     }
+    qInfo() << "WalletTests: creating wallet and scanning chain";
     bitdb.MakeMock();
     std::unique_ptr<CWalletDBWrapper> dbw(new CWalletDBWrapper(&bitdb, "wallet_test.dat"));
     CWallet wallet(std::move(dbw));
@@ -178,6 +181,7 @@ void TestGUI()
     wallet.SetBroadcastTransactions(true);
 
     // Create widgets for sending coins and listing transactions.
+    qInfo() << "WalletTests: creating wallet widgets";
     std::unique_ptr<const PlatformStyle> platformStyle(PlatformStyle::instantiate("other"));
     SendCoinsDialog sendCoinsDialog(platformStyle.get());
     TransactionView transactionView(platformStyle.get());
@@ -187,6 +191,7 @@ void TestGUI()
     transactionView.setModel(&walletModel);
 
     // Send two transactions, and verify they are added to transaction list.
+    qInfo() << "WalletTests: testing sends";
     TransactionTableModel* transactionTableModel = walletModel.getTransactionTableModel();
     QCOMPARE(transactionTableModel->rowCount({}), 105);
     uint256 txid1 = SendCoins(wallet, sendCoinsDialog, CKeyID(), 5 * COIN, false /* rbf */);
@@ -196,12 +201,14 @@ void TestGUI()
     QVERIFY(FindTx(*transactionTableModel, txid2).isValid());
 
     // Call bumpfee. Test disabled, canceled, enabled, then failing cases.
+    qInfo() << "WalletTests: testing bumpfee";
     BumpFee(transactionView, txid1, true /* expect disabled */, "not BIP 125 replaceable" /* expected error */, false /* cancel */);
     BumpFee(transactionView, txid2, false /* expect disabled */, {} /* expected error */, true /* cancel */);
     BumpFee(transactionView, txid2, false /* expect disabled */, {} /* expected error */, false /* cancel */);
     BumpFee(transactionView, txid2, true /* expect disabled */, "already bumped" /* expected error */, false /* cancel */);
 
     // Check current balance on OverviewPage
+    qInfo() << "WalletTests: testing overview and receive";
     OverviewPage overviewPage(platformStyle.get());
     overviewPage.setWalletModel(&walletModel);
     QLabel* balanceLabel = overviewPage.findChild<QLabel*>("labelBalance");
@@ -265,6 +272,7 @@ void TestGUI()
 
     bitdb.Flush(true);
     bitdb.Reset();
+    qInfo() << "WalletTests: completed";
 }
 
 }

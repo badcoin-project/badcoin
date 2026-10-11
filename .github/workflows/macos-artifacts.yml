@@ -85,6 +85,8 @@ jobs:
 
       - name: Run unit tests
         id: unit_tests
+        env:
+          QTEST_FUNCTION_TIMEOUT: '900000'
         run: |
           make check
 

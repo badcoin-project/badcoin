@@ -76,6 +76,9 @@ void PaymentServerTests::paymentServerTests()
     std::vector<unsigned char> data;
     SendCoinsRecipient r;
     QString merchant;
+    // Keep the signed certificate fixtures testable after their real-world expiry.
+    const QDateTime fixtureTime = QDateTime::fromString("2018-01-01T00:00:00Z", Qt::ISODate);
+    QVERIFY(fixtureTime.isValid());
 
     // Now feed PaymentRequests to server, and observe signals it produces
 
@@ -83,31 +86,31 @@ void PaymentServerTests::paymentServerTests()
     // caCert1 certificate authority:
     data = DecodeBase64(paymentrequest1_cert1_BASE64);
     r = handleRequest(server, data);
-    r.paymentRequest.getMerchant(caStore, merchant);
+    r.paymentRequest.getMerchant(caStore, merchant, fixtureTime);
     QCOMPARE(merchant, QString("testmerchant.org"));
 
     // Signed, but expired, merchant cert in the request:
     data = DecodeBase64(paymentrequest2_cert1_BASE64);
     r = handleRequest(server, data);
-    r.paymentRequest.getMerchant(caStore, merchant);
+    r.paymentRequest.getMerchant(caStore, merchant, fixtureTime);
     QCOMPARE(merchant, QString(""));
 
     // 10-long certificate chain, all intermediates valid:
     data = DecodeBase64(paymentrequest3_cert1_BASE64);
     r = handleRequest(server, data);
-    r.paymentRequest.getMerchant(caStore, merchant);
+    r.paymentRequest.getMerchant(caStore, merchant, fixtureTime);
     QCOMPARE(merchant, QString("testmerchant8.org"));
 
     // Long certificate chain, with an expired certificate in the middle:
     data = DecodeBase64(paymentrequest4_cert1_BASE64);
     r = handleRequest(server, data);
-    r.paymentRequest.getMerchant(caStore, merchant);
+    r.paymentRequest.getMerchant(caStore, merchant, fixtureTime);
     QCOMPARE(merchant, QString(""));
 
     // Validly signed, but by a CA not in our root CA list:
     data = DecodeBase64(paymentrequest5_cert1_BASE64);
     r = handleRequest(server, data);
-    r.paymentRequest.getMerchant(caStore, merchant);
+    r.paymentRequest.getMerchant(caStore, merchant, fixtureTime);
     QCOMPARE(merchant, QString(""));
 
     // Try again with no root CA's, verifiedMerchant should be empty:
@@ -115,7 +118,7 @@ void PaymentServerTests::paymentServerTests()
     PaymentServer::LoadRootCAs(caStore);
     data = DecodeBase64(paymentrequest1_cert1_BASE64);
     r = handleRequest(server, data);
-    r.paymentRequest.getMerchant(caStore, merchant);
+    r.paymentRequest.getMerchant(caStore, merchant, fixtureTime);
     QCOMPARE(merchant, QString(""));
 
     // Load second root certificate
