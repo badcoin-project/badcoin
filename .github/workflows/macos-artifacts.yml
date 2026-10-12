@@ -29,19 +29,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          architecture: arm64
+
       - name: Install build dependencies
         run: |
-          brew install automake libtool pkg-config cmake python3 python-setuptools
-          PYTHON_PREFIX="$(brew --prefix python)"
-          PYTHON_VERSION="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-          PYTHON_SITE="$(brew --prefix)/lib/python${PYTHON_VERSION}/site-packages"
-          export PATH="${PYTHON_PREFIX}/libexec/bin:${PYTHON_PREFIX}/bin:${PATH}"
-          export PYTHONPATH="${PYTHON_SITE}${PYTHONPATH:+:${PYTHONPATH}}"
-          echo "${PYTHON_PREFIX}/libexec/bin" >> "${GITHUB_PATH}"
-          echo "${PYTHON_PREFIX}/bin" >> "${GITHUB_PATH}"
-          echo "PYTHONPATH=${PYTHONPATH}" >> "${GITHUB_ENV}"
+          brew install automake libtool pkg-config cmake
+          python -m pip install setuptools
           python --version
           python -c "import setuptools; print(setuptools.__version__)"
+          python3 -W ignore::DeprecationWarning -c "import asyncore"
 
       - name: Build depends
         run: |
