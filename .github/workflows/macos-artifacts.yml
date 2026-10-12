@@ -79,6 +79,11 @@ jobs:
             exit 1
           fi
 
+      - name: Verify secp256k1 test toolchain
+        run: |
+          grep -E '^(CPPFLAGS|LDFLAGS|SECP_TEST_INCLUDES|SECP_TEST_LIBS) =' src/secp256k1/Makefile
+          make -C src/secp256k1 V=1 tests
+
       - name: Build
         run: |
           make ${MAKEJOBS}
