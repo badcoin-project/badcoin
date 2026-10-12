@@ -206,8 +206,12 @@ jobs:
           core/badcoind --version
           core/badcoin-cli --version
           core/badcoin-tx --help
-          QT_QPA_PLATFORM=offscreen qt/badcoin-qt -help >/tmp/badcoin-qt-help.txt 2>&1 || true
-          grep -E "Badcoin|badcoin-qt" /tmp/badcoin-qt-help.txt
+          if ! QT_QPA_PLATFORM=cocoa qt/badcoin-qt -help >"$RUNNER_TEMP/badcoin-qt-help.txt" 2>&1; then
+            cat "$RUNNER_TEMP/badcoin-qt-help.txt"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/badcoin-qt-help.txt"
+          grep -E "Badcoin|badcoin-qt" "$RUNNER_TEMP/badcoin-qt-help.txt"
 
       - name: Smoke-test daemon and RPC
         run: |
