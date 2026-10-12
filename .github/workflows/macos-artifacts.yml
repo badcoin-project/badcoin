@@ -131,6 +131,9 @@ jobs:
           cd artifacts/macos-arm64-core
           shasum -a 256 badcoind badcoin-cli badcoin-tx > SHA256SUMS.txt
           cat SHA256SUMS.txt
+          cd ..
+          tar -czf badcoin-macos-arm64-core.tar.gz -C macos-arm64-core .
+          shasum -a 256 badcoin-macos-arm64-core.tar.gz > badcoin-macos-arm64-core.SHA256SUMS.txt
 
       - name: Stage macOS Qt artifact
         run: |
@@ -142,12 +145,17 @@ jobs:
           cd artifacts/macos-arm64-qt
           shasum -a 256 badcoind badcoin-cli badcoin-tx badcoin-qt > SHA256SUMS.txt
           cat SHA256SUMS.txt
+          cd ..
+          tar -czf badcoin-macos-arm64-qt.tar.gz -C macos-arm64-qt .
+          shasum -a 256 badcoin-macos-arm64-qt.tar.gz > badcoin-macos-arm64-qt.SHA256SUMS.txt
 
       - name: Upload macOS core artifact
         uses: actions/upload-artifact@v7
         with:
           name: badcoin-macos-arm64-core
-          path: artifacts/macos-arm64-core/
+          path: |
+            artifacts/badcoin-macos-arm64-core.tar.gz
+            artifacts/badcoin-macos-arm64-core.SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -155,7 +163,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: badcoin-macos-arm64-qt
-          path: artifacts/macos-arm64-qt/
+          path: |
+            artifacts/badcoin-macos-arm64-qt.tar.gz
+            artifacts/badcoin-macos-arm64-qt.SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -169,16 +179,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: badcoin-macos-arm64-core
-          path: core
+          path: core-archive
 
       - name: Download Qt artifact
         uses: actions/download-artifact@v4
         with:
           name: badcoin-macos-arm64-qt
-          path: qt
+          path: qt-archive
 
       - name: Verify checksums and executables
         run: |
+          (cd core-archive && shasum -a 256 -c badcoin-macos-arm64-core.SHA256SUMS.txt)
+          (cd qt-archive && shasum -a 256 -c badcoin-macos-arm64-qt.SHA256SUMS.txt)
+          mkdir -p core qt
+          tar -xzf core-archive/badcoin-macos-arm64-core.tar.gz -C core
+          tar -xzf qt-archive/badcoin-macos-arm64-qt.tar.gz -C qt
           (cd core && shasum -a 256 -c SHA256SUMS.txt)
           (cd qt && shasum -a 256 -c SHA256SUMS.txt)
           test -x core/badcoind
