@@ -15,6 +15,7 @@
 #include <openssl/x509.h>
 
 #include <QByteArray>
+#include <QDateTime>
 #include <QList>
 #include <QString>
 
@@ -35,8 +36,9 @@ public:
 
     bool IsInitialized() const;
     // Returns true if merchant's identity is authenticated, and
-    // returns human-readable merchant identity in merchant
-    bool getMerchant(X509_STORE* certStore, QString& merchant) const;
+    // returns human-readable merchant identity in merchant.
+    // verificationTime is only set by tests for historical certificate fixtures.
+    bool getMerchant(X509_STORE* certStore, QString& merchant, const QDateTime& verificationTime = QDateTime()) const;
 
     // Returns list of outputs, amount
     QList<std::pair<CScript,CAmount> > getPayTo() const;

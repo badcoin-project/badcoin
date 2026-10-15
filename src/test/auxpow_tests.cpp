@@ -333,7 +333,6 @@ BOOST_AUTO_TEST_CASE (check_auxpow)
 static void
 mineBlock (CBlockHeader& block, bool ok, int nBits = -1)
 {
-  SelectParams (CBaseChainParams::REGTEST);
   const Consensus::Params& params = Params().GetConsensus();
 
   if (nBits == -1)

@@ -374,6 +374,13 @@ if test x"$use_tests" = x"yes"; then
       SECP_TEST_INCLUDES="$SSL_CFLAGS $CRYPTO_CFLAGS"
       SECP_TEST_LIBS="$CRYPTO_LIBS"
 
+      case $host_os in
+      *darwin*)
+        dnl Match the depends headers to the depends libcrypto selected by LDFLAGS.
+        SECP_TEST_INCLUDES="$CPPFLAGS $SECP_TEST_INCLUDES"
+        ;;
+      esac
+
       case $host in
       *mingw*)
         SECP_TEST_LIBS="$SECP_TEST_LIBS -lgdi32"

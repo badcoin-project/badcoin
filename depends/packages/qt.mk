@@ -10,6 +10,7 @@ $(package)_build_subdir=qtbase
 $(package)_qt_libs=corelib network widgets gui plugins testlib
 $(package)_patches=mac-qmake.conf mingw-uuidof.patch pidlist_absolute.patch fix-xcb-include-order.patch
 $(package)_patches+=fix_qt_pkgconfig.patch fix-cocoahelpers-macos.patch qfixed-coretext.patch
+$(package)_patches+=disable-enum-constexpr-conversion.patch
 
 $(package)_qttranslations_file_name=qttranslations-$($(package)_suffix)
 $(package)_qttranslations_sha256_hash=3a15aebd523c6d89fb97b2d3df866c94149653a26d27a00aac9b6d3020bc5a1d
@@ -101,6 +102,7 @@ $(package)_config_opts_linux += -no-opengl
 $(package)_config_opts_arm_linux  = -platform linux-g++ -xplatform $(host)
 $(package)_config_opts_i686_linux  = -xplatform linux-g++-32
 $(package)_config_opts_mingw32  = -no-opengl -xplatform win32-g++ -device-option CROSS_COMPILE="$(host)-"
+$(package)_config_env_arm_darwin = LC_ALL=C
 $(package)_build_env  = QT_RCC_TEST=1
 endef
 
@@ -143,6 +145,13 @@ define $(package)_preprocess_cmds
   patch -p1 < $($(package)_patch_dir)/fix_qt_pkgconfig.patch && \
   patch -p1 < $($(package)_patch_dir)/fix-cocoahelpers-macos.patch && \
   patch -p1 < $($(package)_patch_dir)/qfixed-coretext.patch && \
+  if test "$(host_os)" = darwin; then \
+    patch -p1 < $($(package)_patch_dir)/disable-enum-constexpr-conversion.patch && \
+    printf '#!/bin/sh\n\nLC_ALL=C\nexport LC_ALL\n' > qtbase/config.tests/unix/arch.test.new && \
+    tail -n +2 qtbase/config.tests/unix/arch.test >> qtbase/config.tests/unix/arch.test.new && \
+    mv qtbase/config.tests/unix/arch.test.new qtbase/config.tests/unix/arch.test && \
+    chmod +x qtbase/config.tests/unix/arch.test; \
+  fi && \
   echo "!host_build: QMAKE_CFLAGS     += $($(package)_cflags) $($(package)_cppflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
   echo "!host_build: QMAKE_CXXFLAGS   += $($(package)_cxxflags) $($(package)_cppflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
   echo "!host_build: QMAKE_LFLAGS     += $($(package)_ldflags)" >> qtbase/mkspecs/common/gcc-base.conf && \
@@ -156,6 +165,7 @@ define $(package)_config_cmds
   export PKG_CONFIG_SYSROOT_DIR=/ && \
   export PKG_CONFIG_LIBDIR=$(host_prefix)/lib/pkgconfig && \
   export PKG_CONFIG_PATH=$(host_prefix)/share/pkgconfig  && \
+  if test "$(host_os)" = darwin; then grep -Fx 'export LC_ALL' config.tests/unix/arch.test; fi && \
   ./configure $($(package)_config_opts) && \
   echo "host_build: QT_CONFIG ~= s/system-zlib/zlib" >> mkspecs/qconfig.pri && \
   echo "CONFIG += force_bootstrap" >> mkspecs/qconfig.pri && \

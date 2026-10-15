@@ -1,0 +1,21 @@
+--- a/qtbase/src/corelib/global/qtypetraits.h
++++ b/qtbase/src/corelib/global/qtypetraits.h
+@@ -478,11 +478,18 @@ struct not_c
+ struct not_c
+     : integral_constant<bool, !B> {};
+
+ // Checks whether a type is unsigned (T must be convertible to unsigned int):
++#if defined(__clang__)
++#  pragma clang diagnostic push
++#  pragma clang diagnostic ignored "-Wenum-constexpr-conversion"
++#endif
+ template <typename T>
+ struct is_unsigned
+     : integral_constant<bool, (T(0) < T(-1))> {};
++#if defined(__clang__)
++#  pragma clang diagnostic pop
++#endif
+
+ // Checks whether a type is signed (T must be convertible to int):
+ template <typename T>
+ struct is_signed

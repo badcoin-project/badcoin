@@ -53,13 +53,17 @@ $(package)_config_opts_mipsel_linux=linux-generic32
 $(package)_config_opts_mips_linux=linux-generic32
 $(package)_config_opts_powerpc_linux=linux-generic32
 $(package)_config_opts_x86_64_darwin=darwin64-x86_64-cc
+$(package)_config_opts_arm_darwin=no-asm darwin64-arm64-cc
 $(package)_config_opts_x86_64_mingw32=mingw64
 $(package)_config_opts_i686_mingw32=mingw
 endef
 
 define $(package)_preprocess_cmds
   sed -i.old "/define DATE/d" util/mkbuildinf.pl && \
-  sed -i.old "s|engines apps test|engines|" Makefile.org
+  sed -i.old "s|engines apps test|engines|" Makefile.org && \
+  if test "$(host_os)" = darwin && test "$(host_arch)" = arm; then \
+    perl -0pi -e 's{("darwin64-x86_64-cc",.*\n)}{$$1"darwin64-arm64-cc","cc:-arch arm64 -O3 -DL_ENDIAN -Wall::-D_REENTRANT:MACOSX:-Wl,-search_paths_first%:SIXTY_FOUR_BIT_LONG RC4_CHAR RC4_CHUNK DES_INT DES_UNROLL BF_PTR::macosx:dlfcn:darwin-shared:-fPIC -fno-common:-arch arm64 -dynamiclib:.\$$(SHLIB_MAJOR).\$$(SHLIB_MINOR).dylib",\n}m' Configure; \
+  fi
 endef
 
 define $(package)_config_cmds
