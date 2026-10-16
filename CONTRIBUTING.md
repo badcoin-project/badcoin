@@ -24,8 +24,8 @@ facilitates social contribution, easy testing and peer review.
 
 To contribute a patch, the workflow is as follows:
 
-  1. Fork repository
-  1. Create topic branch
+  1. Fork the repository
+  1. Create a topic branch from `development`
   1. Commit patches
 
 The project coding conventions in the [developer notes](doc/developer-notes.md)
@@ -50,7 +50,7 @@ Please refer to the [Git manual](https://git-scm.com/doc) for more information
 about Git.
 
   - Push changes to your fork
-  - Create pull request
+  - Create a pull request targeting `development`
 
 The title of the pull request should be prefixed by the component or area that
 the pull request affects. Valid areas as:
@@ -85,9 +85,8 @@ Translations are not currently maintained through a dedicated Badcoin Core
 translation process. Please open an issue before starting translation work so the
 project can coordinate the scope and avoid duplicated effort.
 
-If a pull request is not to be considered for merging (yet), please
-prefix the title with [WIP] or use [Tasks Lists](https://help.github.com/articles/basic-writing-and-formatting-syntax/#task-lists)
-in the body of the pull request to indicate tasks are pending.
+If a pull request is not ready for review, create it as a draft or clearly mark
+the remaining work in its task list.
 
 The body of the pull request should contain enough description about what the
 patch does together with any justification/reasoning. You should include

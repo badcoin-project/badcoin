@@ -1,50 +1,66 @@
 Repository Tools
----------------------
+----------------
 
-### [Developer tools](/contrib/devtools) ###
-Specific tools for developers working on this repository.
-Contains the script `github-merge.py` for merging GitHub pull requests securely and signing them using GPG.
+### Developer tools
 
-### [Verify-Commits](/contrib/verify-commits) ###
-Tool to verify that every merge commit was signed by a developer using the above `github-merge.py` script.
+`contrib/devtools/` contains inherited and Badcoin-maintained development
+utilities. Individual tools should be treated according to their current
+repository usage rather than assumed to define release policy.
 
-### [Linearize](/contrib/linearize) ###
-Construct a linear, no-fork, best version of the blockchain.
+### Linearize
 
-### [Qos](/contrib/qos) ###
+`contrib/linearize/` contains blockchain linearization utilities.
 
-A Linux bash script that will set up traffic control (tc) to limit the outgoing bandwidth for connections to the Bitcoin network. This means one can have an always-on bitcoind instance running, and another local bitcoind/bitcoin-qt instance which connects to this node and receives blocks from it.
+### QoS
 
-### [Seeds](/contrib/seeds) ###
-Utility to generate the pnSeed[] array that is compiled into the client.
+`contrib/qos/` contains inherited Linux traffic-control helpers. Review their
+network assumptions before use with Badcoin.
 
-Build Tools and Keys
----------------------
+### Seeds
 
-### [Debian](/contrib/debian) ###
-Contains files used to package bitcoind/bitcoin-qt
-for Debian-based Linux systems. If you compile bitcoind/bitcoin-qt yourself, there are some useful files here.
+`contrib/seeds/` contains seed-generation utilities and documentation. There
+is currently no authoritative automated Badcoin fixed-seed regeneration source;
+see `contrib/seeds/README.md`.
 
-### [Gitian-descriptors](/contrib/gitian-descriptors) ###
-Files used during the gitian build process. For more information about gitian, see the [the Bitcoin Core documentation repository](https://github.com/bitcoin-core/docs).
+Build and release-related tools
+-------------------------------
 
-### [Gitian-keys](/contrib/gitian-keys)
-PGP keys used for signing Bitcoin Core [Gitian release](/doc/release-process.md) results.
+### Debian
 
-### [MacDeploy](/contrib/macdeploy) ###
-Scripts and notes for Mac builds. 
+`contrib/debian/` contains inherited Debian packaging material. It is not the
+authoritative v1 artifact workflow.
 
-### [RPM](/contrib/rpm) ###
-RPM spec file for building bitcoin-core on RPM based distributions.
+### Gitian
 
-### [Gitian-build](/contrib/gitian-build.sh) ###
-Script for running full Gitian builds.
+`contrib/gitian-build.sh`, `contrib/gitian-descriptors/`, and
+`contrib/gitian-keys/` are legacy/optional Gitian material. They are not the
+authoritative Badcoin Core v1 release path and do not establish current Badcoin
+release signing infrastructure.
 
-Test and Verify Tools 
----------------------
+The maintained v1 build-validation workflows are under `.github/workflows/`:
+Linux x64 core, Windows x64 core/Qt, and macOS arm64 core/Qt.
 
-### [TestGen](/contrib/testgen) ###
-Utilities to generate test vectors for the data-driven Bitcoin tests.
+### MacDeploy
 
-### [Verify Binaries](/contrib/verifybinaries) ###
-This script attempts to download and verify the signature file SHA256SUMS.asc from bitcoin.org.
+`contrib/macdeploy/` contains inherited macOS deployment helpers. The
+maintained macOS v1 validation path is `.github/workflows/macos-artifacts.yml`.
+
+### RPM
+
+`contrib/rpm/` contains inherited RPM packaging material and is not a
+release-qualified v1 artifact path.
+
+Test and verification tools
+---------------------------
+
+### TestGen
+
+`contrib/testgen/` contains utilities for generating test vectors.
+
+### Verify binaries
+
+`contrib/verifybinaries/verify.sh` is an inherited Bitcoin Core verifier that
+downloads Bitcoin release signatures. It does **not** verify Badcoin Core
+releases and is non-authoritative for v1. See
+`contrib/verifybinaries/README.md` for the current Badcoin checksum and
+verification status.
