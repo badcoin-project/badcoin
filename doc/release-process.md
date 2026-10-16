@@ -7,89 +7,110 @@ Badcoin Core releases continue the existing Badcoin blockchain. A release is not
 a new chain launch and must not reset chain history, balances, consensus rules,
 or network identity unless a separate consensus-change process explicitly says so.
 
+## Maintained validation workflows
+
+The maintained v1 release-validation workflows are:
+
+- Linux x64 core: `.github/workflows/linux-artifacts.yml`
+- Windows x64 core and Qt: `.github/workflows/windows-artifacts.yml`
+- macOS arm64 core and Qt: `.github/workflows/macos-artifacts.yml`
+
+These workflows run for pull requests and for pushes to `development` and
+`main`. They are validation and artifact-building workflows; their artifacts
+are not automatically final public wallet releases.
+
+The current workflows provide, as implemented per platform:
+
+- build validation for the listed platform/variant;
+- SHA-256 checksum generation and verification;
+- smoke-test validation of produced binaries;
+- unit and focused functional tests where the workflow implements them.
+
+Gitian files and `contrib/gitian-build.sh` are legacy/optional and are not the
+authoritative v1 release path. `contrib/verifybinaries/verify.sh` is an
+inherited Bitcoin verification tool and is not a Badcoin release verifier.
+
 ## Before a Release Candidate
 
 - Confirm the target version in `configure.ac`.
-- Confirm `CLIENT_VERSION_IS_RELEASE` is set correctly for the release candidate or final release.
+- Confirm `CLIENT_VERSION_IS_RELEASE` is set correctly for the candidate.
 - Confirm public-facing metadata uses Badcoin Core naming.
 - Confirm release notes exist under `doc/release-notes/`.
 - Confirm `doc/release-notes.md` links to the current release note.
-- Confirm Linux and Windows build documentation matches the current workflows.
-- Confirm CI passes on the release branch.
-- Confirm generated artifacts are from the intended commit.
+- Confirm Linux x64, Windows x64 core/Qt, and macOS arm64 core/Qt validation
+  workflows pass for the intended candidate commit.
+- Confirm generated artifacts and checksums are from that commit.
+- Review smoke-test results produced by the maintained workflows.
+
+## Release Candidate identity
+
+A release candidate is a specific candidate build and package set.
+
+If an RC changes in a way that changes its binaries or packaged contents, the
+changed candidate must receive a new RC designation. Do not silently replace or
+mutate an already designated RC while keeping the same RC identity.
+
+Documentation-only changes that do not alter an RC's binaries or packaged
+contents still require review, but they do not by themselves redefine the
+candidate binary identity.
 
 ## Chain Parameters
 
 Only update chain-parameter checkpoints or assumptions when there is specific
-evidence and review for the selected value.
-
-If updating chain parameters:
-
-- Record the source command used to obtain the value.
-- Prefer a block safely behind the current tip.
-- Confirm the selected block is not orphaned.
-- Review any `nMinimumChainWork` or `defaultAssumeValid` change carefully.
-- Do not mix unrelated release-documentation cleanup with consensus or chain-parameter changes unless the scope is clearly documented.
+evidence and review for the selected value. Chain-parameter changes are outside
+ordinary release-documentation work and must be handled explicitly.
 
 ## Release Notes
 
-For each release, create a versioned release-note file:
+For each release, maintain a versioned release-note file:
 
-'doc/release-notes/release-notes-X.Y.Z.W.md'
+`doc/release-notes/release-notes-X.Y.Z.W.md`
 
-Put the full release notes in that versioned file.
+Put the full release notes in that versioned file, then update
+`doc/release-notes.md` so it links to the current release note.
 
-Then update `doc/release-notes.md` so it links to the current release note.
+## Candidate validation
 
-Do not paste the full release note into `doc/release-notes.md`. That file is only the index.
+Before approving a release candidate for promotion:
 
-## Release Candidate
+- Confirm the candidate branch contains only intended changes.
+- Confirm the version and release notes.
+- Confirm Linux x64 core validation.
+- Confirm Windows x64 core and Qt validation.
+- Confirm macOS arm64 core and Qt validation.
+- Verify the workflow-generated checksums.
+- Review implemented smoke-test validation.
+- Confirm the artifacts correspond to the intended commit.
 
-A release candidate is a test release before the final release.
+Development workflow artifacts are not final wallet releases merely because they
+passed CI.
 
-Before publishing a release candidate:
+## Final release
 
-- Confirm the release branch contains only intended changes.
-- Confirm the version in `configure.ac`.
-- Confirm release notes are present and linked.
-- Confirm Linux and Windows workflows pass.
-- Confirm artifacts were built from the intended commit.
-- Mark the release clearly as a release candidate.
+Final publication mechanics are pending completion of the automated release
+workflow. Do not claim that signing, tagging, GitHub Release creation, artifact
+attachment, or public publication is automated until the repository implements
+and validates those steps.
 
-Development builds and workflow artifacts are not final wallet releases.
+Before a final release is published, maintainers must at minimum:
 
-## Final Release
+- identify the exact approved candidate commit;
+- confirm the final release is built from the approved candidate identity;
+- confirm all maintained platform validations pass;
+- verify checksums and smoke-test results;
+- confirm the release notes match the approved contents;
+- perform the still-manual publication steps under maintainer approval.
 
-Before publishing a final release:
+No signing infrastructure is claimed by this document.
 
-- Confirm the final release commit.
-- Confirm CI passes for that commit.
-- Confirm expected Linux and Windows artifacts exist.
-- Generate or verify checksums for release artifacts.
-- Confirm the release notes match the final release.
-- Create the final Git tag.
-- Create the GitHub release from the final tag.
-- Attach artifacts and checksums.
+Official releases, once deliberately published, are hosted at:
+https://github.com/badcoin-project/badcoin/releases
 
-Official releases are published at:
+## Announcement and post-release
 
-'https://github.com/badcoin-project/badcoin/releases'
+After deliberate publication, link to the GitHub release, remind users to back
+up wallet data before upgrading, and state that the release continues the
+existing Badcoin chain.
 
-## Announcement
-
-After the final release is published:
-
-- Link to the GitHub release.
-- Remind users to back up wallet data before upgrading.
-- State that the release continues the existing Badcoin chain.
-- Avoid price, investment, or speculative framing.
-
-## After Release
-
-After release publication:
-
-- Confirm the GitHub release page is public.
-- Confirm artifacts and checksums are downloadable.
-- Watch for issue reports.
-- Track follow-up fixes separately.
-- Do not silently replace published artifacts. Publish a corrected release or follow-up release if needed.
+Do not silently replace published artifacts. A changed binary or package must
+receive a new release identity appropriate to the change.

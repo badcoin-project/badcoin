@@ -1,115 +1,75 @@
-Mac OS X Build Instructions and Notes
-====================================
-The commands in this guide should be executed in a Terminal application.
-The built-in one is located in `/Applications/Utilities/Terminal.app`.
+macOS arm64 Build Instructions and Notes
+========================================
+
+Badcoin Core v1 is validated on native Apple Silicon through
+`.github/workflows/macos-artifacts.yml`. That workflow runs on `macos-14`,
+builds both core and Qt variants, runs unit and focused functional tests,
+generates SHA-256 checksums, and smoke-tests the produced artifacts.
+
+The workflow is the release-validation reference. Local builds are useful for
+development, but a local build does not replace the workflow result.
 
 Preparation
 -----------
-Install the OS X command line tools:
 
-`xcode-select --install`
+Install the Xcode command line tools:
 
-When the popup appears, click `Install`.
+    xcode-select --install
 
-Then install [Homebrew](https://brew.sh).
+Install Homebrew, then the host tools used by the maintained workflow:
 
-Dependencies
-----------------------
+    brew install automake libtool pkg-config cmake
 
-    brew install automake berkeley-db4 libtool boost miniupnpc openssl pkg-config protobuf python3 qt libevent
+The maintained workflow also uses Python 3.11 with setuptools.
 
-See [dependencies.md](dependencies.md) for a complete overview.
+Build using depends
+-------------------
 
-If you want to build the disk image with `make deploy` (.dmg / optional), you need RSVG
+From the repository root:
 
-    brew install librsvg
+    make -C depends -j2
+    ./autogen.sh
+    HOST="$(./depends/config.guess)"
+    CXXFLAGS="-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION" \
+      CONFIG_SITE="$PWD/depends/$HOST/share/config.site" ./configure \
+      --prefix=/ \
+      --disable-ccache \
+      --disable-maintainer-mode \
+      --disable-dependency-tracking \
+      --disable-bench \
+      --with-gui=qt5
+    make -j2
+    make check
 
-NOTE: Building with Qt4 is still supported, however, could result in a broken UI. Building with Qt5 is recommended.
+The macOS arm64 workflow also applies the repository's arm64 test compatibility
+step before configuration and runs:
 
-Berkeley DB
------------
-It is recommended to use Berkeley DB 4.8. If you have to build it yourself,
-you can use [the installation script included in contrib/](/contrib/install_db4.sh)
-like so
+    test/functional/test_runner.py feature_datacarrier.py p2p_message_size.py
 
-```shell
-./contrib/install_db4.sh .
-```
+Artifacts
+---------
 
-from the root of the repository.
+The maintained workflow stages two unsigned, checksummed tarball artifacts:
 
-**Note**: You only need Berkeley DB if the wallet is enabled (see the section *Disable-Wallet mode* below).
+- `badcoin-macos-arm64-core`: `badcoind`, `badcoin-cli`, and `badcoin-tx`.
+- `badcoin-macos-arm64-qt`: the core binaries plus `badcoin-qt`.
 
-Build Badcoin Core
-------------------------
-
-1. Clone the badcoin source code and cd into `badcoin`
-
-        git clone https://github.com/badcoin-project/badcoin.git
-        cd badcoin
-
-2.  Build badcoin-core:
-
-    Configure and build the headless badcoin binaries as well as the GUI (if Qt is found).
-
-    You can disable the GUI build by passing `--without-gui` to configure.
-
-        ./autogen.sh
-        ./configure
-        make
-
-3.  It is recommended to build and run the unit tests:
-
-        make check
-
-4.  You can also create a .dmg that contains the .app bundle (optional):
-
-        make deploy
+The smoke job verifies archive and per-binary checksums, executable permissions,
+core version/help output, Qt launch/help behavior, and daemon/RPC startup.
 
 Running
 -------
 
-Badcoin Core is now available at `./src/badcoind`
+The daemon is built at:
 
-Before running, it's recommended you create an RPC configuration file.
+    ./src/badcoind
 
-    echo -e "rpcuser=badcoinrpc\nrpcpassword=$(xxd -l 16 -p /dev/urandom)" > "/Users/${USER}/Library/Application Support/Badcoin/badcoin.conf"
+The Qt wallet is built at:
 
-    chmod 600 "/Users/${USER}/Library/Application Support/Badcoin/badcoin.conf"
+    ./src/qt/badcoin-qt
 
-The first time you run badcoind, it will start downloading the blockchain. This process could take several hours.
+The default configuration file is:
 
-You can monitor the download process by looking at the debug.log file:
+    ~/Library/Application Support/Badcoin/badcoin.conf
 
-    tail -f $HOME/Library/Application\ Support/Badcoin/debug.log
-
-Other commands:
--------
-
-    ./src/badcoind -daemon # Starts the badcoin daemon.
-    ./src/badcoin-cli --help # Outputs a list of command-line options.
-    ./src/badcoin-cli help # Outputs a list of RPC commands when the daemon is running.
-
-Using Qt Creator as IDE
-------------------------
-You can use Qt Creator as an IDE, for badcoin development.
-Download and install the community edition of [Qt Creator](https://www.qt.io/download/).
-Uncheck everything except Qt Creator during the installation process.
-
-1. Make sure you installed everything through Homebrew mentioned above
-2. Do a proper ./configure --enable-debug
-3. In Qt Creator do "New Project" -> Import Project -> Import Existing Project
-4. Enter "badcoin-qt" as project name, enter src/qt as location
-5. Leave the file selection as it is
-6. Confirm the "summary page"
-7. In the "Projects" tab select "Manage Kits..."
-8. Select the default "Desktop" kit and select "Clang (x86 64bit in /usr/bin)" as compiler
-9. Select LLDB as debugger (you might need to set the path to your installation)
-10. Start debugging with Qt Creator
-
-Notes
------
-
-* Tested on OS X 10.8 through 10.13 on 64-bit Intel processors only.
-
-* Building with downloaded Qt binaries is not officially supported. See the notes in [#7714](https://github.com/bitcoin/bitcoin/issues/7714)
+This document does not claim Intel macOS release qualification for v1.

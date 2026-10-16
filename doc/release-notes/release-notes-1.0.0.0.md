@@ -49,8 +49,9 @@ These changes were foundational work, completed before release qualification, te
 ### Release foundations
 
 - Established Badcoin Core `v1.0.0.0` as the first modernized community-maintained release line.
-- Added maintained Linux and Windows build workflows.
-- Added Linux and Windows artifact generation.
+- Added maintained Linux x64, Windows x64, and macOS arm64 build workflows.
+- Added Linux x64 core, Windows x64 core/Qt, and macOS arm64 core/Qt artifact generation.
+- Added per-platform checksum generation and smoke-test validation for maintained v1 artifacts.
 - Updated project, build, and release documentation.
 - Corrected inherited Bitcoin branding in public-facing Windows metadata.
 
