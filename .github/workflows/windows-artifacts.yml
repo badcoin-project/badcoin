@@ -131,6 +131,7 @@ jobs:
 
           cd "artifacts/windows-x64-${{ matrix.variant }}"
           sha256sum *.exe > SHA256SUMS.txt
+          printf '{"commit":"%s","platform":"windows-x64-${{ matrix.variant }}","workflow":"windows-artifacts.yml"}\n' "$GITHUB_SHA" > provenance.json
           cat SHA256SUMS.txt
 
       - name: Upload artifact
@@ -253,3 +254,43 @@ jobs:
           path: \${{ runner.temp }}/badcoin-windows-core-smoke
           if-no-files-found: warn
           retention-days: 14
+
+  windows-qt-smoke:
+    name: Windows x64 Qt smoke test
+    needs: windows-build
+    runs-on: windows-latest
+
+    steps:
+      - name: Download Windows Qt artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: badcoin-windows-x64-qt
+          path: artifact
+
+      - name: Verify Windows Qt artifact
+        shell: pwsh
+        working-directory: artifact
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($line in Get-Content .\SHA256SUMS.txt) {
+            if ($line -notmatch '^([0-9a-fA-F]{64})\s+[* ](.+)$') {
+              throw "Invalid checksum line: $line"
+            }
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Matches[2]).Hash.ToLowerInvariant()
+            if ($actual -ne $Matches[1].ToLowerInvariant()) {
+              throw "Checksum mismatch: $($Matches[2])"
+            }
+          }
+          foreach ($file in @('badcoind.exe', 'badcoin-cli.exe', 'badcoin-tx.exe', 'badcoin-qt.exe')) {
+            if (-not (Test-Path -LiteralPath $file)) { throw "Missing binary: $file" }
+          }
+
+      - name: Smoke-test Windows Qt binary
+        shell: pwsh
+        working-directory: artifact
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $help = (& .\badcoin-qt.exe -help 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0 -or $help -notmatch 'Badcoin') {
+            throw "badcoin-qt help identity check failed: $help"
+          }

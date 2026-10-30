@@ -106,6 +106,43 @@ No signing infrastructure is claimed by this document.
 Official releases, once deliberately published, are hosted at:
 https://github.com/badcoin-project/badcoin/releases
 
+## GitHub Actions release preparation
+
+`Release preparation` is a manually dispatched, nonpublishing workflow. It
+requires an immutable candidate commit SHA, a new `vX.Y.Z.W-rcN` designation,
+and one successful artifact workflow run ID for Linux, Windows, and macOS.
+It rejects duplicate run IDs, a source run from another workflow or commit,
+unsuccessful source runs, incomplete artifacts, invalid checksums, missing
+provenance, and an existing tag, branch, or release.
+
+The platform artifact workflows retain a candidate SHA provenance record with
+their artifacts. The preparation workflow checks that record, checksum files,
+the expected core/Qt executable inventories, and the existing smoke-test gates
+before producing a `badcoin-release-ready-staging` artifact. That artifact
+contains an unsigned deterministic `release-manifest.json` and
+`VALIDATION-REPORT.txt`. It does not create a tag, create a GitHub Release, or
+publish files.
+
+An approved maintainer may perform a dry run by manually dispatching `Release
+preparation` with a candidate SHA and a deliberately unused RC designation,
+then inspecting the uploaded staging artifact and comparing the manifest
+checksum, commit, package inventory, and validation report with the selected
+source workflow runs. A successful staging result remains review evidence only.
+
+`Release publication` is a separate manually dispatched workflow. Repository
+administrators must protect the `release-publication` GitHub environment with
+the required reviewer approval before it can run. It has `contents: write`
+only in its protected publication job; ordinary CI and preparation retain
+read-only contents access. The maintainer must supply the exact successful
+preparation run ID, release tag, manifest SHA-256, and the literal approval
+value requested by the workflow. Publication rechecks tag/release collisions,
+the preparation run identity, manifest checksum, candidate commit, and unsigned
+status before it can create the release.
+
+No cryptographic release signing is configured by these workflows. Staged and
+published packages are explicitly labeled unsigned until separate signing
+infrastructure is implemented and validated.
+
 ## Announcement and post-release
 
 After deliberate publication, link to the GitHub release, remind users to back

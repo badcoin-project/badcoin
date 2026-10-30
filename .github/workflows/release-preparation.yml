@@ -1,0 +1,145 @@
+name: Release preparation
+
+"on":
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Immutable 40-character candidate commit SHA
+        required: true
+        type: string
+      release_tag:
+        description: New RC tag in vX.Y.Z.W-rcN form; this workflow never creates it
+        required: true
+        type: string
+      linux_run_id:
+        description: Successful Linux artifact workflow run ID for the candidate
+        required: true
+        type: string
+      windows_run_id:
+        description: Successful Windows artifact workflow run ID for the candidate
+        required: true
+        type: string
+      macos_run_id:
+        description: Successful macOS artifact workflow run ID for the candidate
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: release-preparation-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    name: Verify and stage release candidate
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Validate candidate and source workflow runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const candidate = '${{ inputs.candidate_sha }}';
+            const tag = '${{ inputs.release_tag }}';
+            if (!/^[0-9a-f]{40}$/.test(candidate)) {
+              throw new Error('candidate_sha must be a lowercase 40-character SHA');
+            }
+            if (!/^v[0-9]+(?:\.[0-9]+){3}-rc[0-9]+$/.test(tag)) {
+              throw new Error('release_tag must be a new vX.Y.Z.W-rcN designation');
+            }
+            const sources = [
+              ['${{ inputs.linux_run_id }}', 'linux-artifacts.yml'],
+              ['${{ inputs.windows_run_id }}', 'windows-artifacts.yml'],
+              ['${{ inputs.macos_run_id }}', 'macos-artifacts.yml'],
+            ];
+            const seen = new Set();
+            for (const [runId, expectedPath] of sources) {
+              if (!/^\d+$/.test(runId) || seen.has(runId)) {
+                throw new Error('source workflow run IDs must be distinct positive integers');
+              }
+              seen.add(runId);
+              const { data: run } = await github.rest.actions.getWorkflowRun({
+                owner: context.repo.owner, repo: context.repo.repo, run_id: Number(runId),
+              });
+              if (run.conclusion !== 'success' || run.head_sha !== candidate || run.path !== `.github/workflows/${expectedPath}`) {
+                throw new Error(`run ${runId} is not a successful ${expectedPath} run for ${candidate}`);
+              }
+            }
+            for (const reference of [`tags/${tag}`, `heads/${tag}`]) {
+              try {
+                await github.rest.git.getRef({ owner: context.repo.owner, repo: context.repo.repo, ref: reference });
+                throw new Error(`candidate tag or branch already exists: ${tag}`);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+            try {
+              await github.rest.repos.getReleaseByTag({ owner: context.repo.owner, repo: context.repo.repo, tag });
+              throw new Error(`release already exists for ${tag}`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+
+      - name: Confirm checked-out candidate
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.candidate_sha }}"
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: badcoin-linux-x64-core
+          path: input/linux-x64-core
+          run-id: ${{ inputs.linux_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: badcoin-windows-x64-*
+          path: input
+          merge-multiple: false
+          run-id: ${{ inputs.windows_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Normalize Windows artifact directories
+        run: |
+          mv input/badcoin-windows-x64-core input/windows-x64-core
+          mv input/badcoin-windows-x64-qt input/windows-x64-qt
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: badcoin-macos-arm64-*
+          path: input
+          merge-multiple: false
+          run-id: ${{ inputs.macos_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Normalize macOS artifact directories
+        run: |
+          mv input/badcoin-macos-arm64-core input/macos-arm64-core
+          mv input/badcoin-macos-arm64-qt input/macos-arm64-qt
+
+      - name: Verify and build release-ready staging package
+        run: |
+          python3 contrib/release/prepare_release_package.py \
+            --input-dir input \
+            --output-dir release-ready \
+            --candidate-sha "${{ inputs.candidate_sha }}" \
+            --release-tag "${{ inputs.release_tag }}"
+
+      - name: Upload release-ready staging package
+        uses: actions/upload-artifact@v7
+        with:
+          name: badcoin-release-ready-staging
+          path: release-ready/
+          if-no-files-found: error
+          retention-days: 30
