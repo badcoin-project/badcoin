@@ -106,6 +106,55 @@ No signing infrastructure is claimed by this document.
 Official releases, once deliberately published, are hosted at:
 https://github.com/badcoin-project/badcoin/releases
 
+## GitHub Actions release preparation
+
+`Release preparation` is a manually dispatched, nonpublishing workflow. It
+requires an immutable candidate commit SHA, a new `vX.Y.Z.W-rcN` designation,
+and one successful artifact workflow run ID for Linux, Windows, and macOS.
+It rejects duplicate run IDs, source runs outside `development` or `main`,
+untrusted events, a source run from another workflow or commit, unsuccessful
+source runs, incomplete artifacts, invalid checksums, missing provenance, and
+an existing tag, branch, or release.
+
+The platform artifact workflows retain a candidate SHA provenance record with
+their artifacts. This JSON is workflow metadata, not a cryptographic
+attestation. The preparation workflow checks it together with the trusted
+workflow-run identity, checksum files,
+the expected core/Qt executable inventories, and the existing smoke-test gates
+before producing a `badcoin-release-ready-staging` artifact. That artifact
+contains an unsigned deterministic `release-manifest.json` and
+`VALIDATION-REPORT.txt`. It does not create a tag, create a GitHub Release, or
+publish files.
+
+An approved maintainer may perform a dry run by manually dispatching `Release
+preparation` with a candidate SHA and a deliberately unused RC designation,
+then inspecting the uploaded staging artifact and comparing the manifest
+checksum, commit, package inventory, and validation report with the selected
+source workflow runs. A successful staging result remains review evidence only.
+
+`Release publication` is a separate manually dispatched workflow. Repository
+administrators must protect the `release-publication` GitHub environment with
+GitHub required reviewers before it can run. GitHub's native environment gate
+blocks the protected job until that review is approved; the workflow does not
+call the administrative environment API or accept a typed approval as a
+substitute. It has `contents: write` only in its protected publication job;
+ordinary CI and preparation retain read-only contents access. The maintainer
+must supply the exact successful preparation run ID, release tag, and manifest
+SHA-256. Publication rechecks tag/release collisions, the preparation run
+identity, manifest checksum, candidate commit, unsigned status, and the
+SHA-256 of every staged package file before it can create the prerelease.
+
+Before authorizing publication, a repository administrator must open **Settings
+→ Environments → release-publication**, enable **Required reviewers**, and
+select the required maintainers. The administrator should then save the rule
+and confirm that the protected environment displays its required-reviewer rule.
+This configuration is an external repository-control requirement; a workflow
+cannot reliably inspect it with its ordinary `GITHUB_TOKEN`.
+
+No cryptographic release signing is configured by these workflows. Staged and
+published packages are explicitly labeled unsigned until separate signing
+infrastructure is implemented and validated.
+
 ## Announcement and post-release
 
 After deliberate publication, link to the GitHub release, remind users to back
