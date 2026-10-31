@@ -134,15 +134,22 @@ source workflow runs. A successful staging result remains review evidence only.
 
 `Release publication` is a separate manually dispatched workflow. Repository
 administrators must protect the `release-publication` GitHub environment with
-GitHub required reviewers before it can run. The workflow queries that
-protection rule and fails closed when it cannot verify it. It has `contents: write`
-only in its protected publication job; ordinary CI and preparation retain
-read-only contents access. The maintainer must supply the exact successful
-preparation run ID, release tag, and manifest SHA-256. Environment reviewer
-approval is the authorization boundary; a typed workflow input is not treated
-as authorization. Publication rechecks tag/release collisions, the preparation
-run identity, manifest checksum, candidate commit, unsigned status, and the
+GitHub required reviewers before it can run. GitHub's native environment gate
+blocks the protected job until that review is approved; the workflow does not
+call the administrative environment API or accept a typed approval as a
+substitute. It has `contents: write` only in its protected publication job;
+ordinary CI and preparation retain read-only contents access. The maintainer
+must supply the exact successful preparation run ID, release tag, and manifest
+SHA-256. Publication rechecks tag/release collisions, the preparation run
+identity, manifest checksum, candidate commit, unsigned status, and the
 SHA-256 of every staged package file before it can create the prerelease.
+
+Before authorizing publication, a repository administrator must open **Settings
+→ Environments → release-publication**, enable **Required reviewers**, and
+select the required maintainers. The administrator should then save the rule
+and confirm that the protected environment displays its required-reviewer rule.
+This configuration is an external repository-control requirement; a workflow
+cannot reliably inspect it with its ordinary `GITHUB_TOKEN`.
 
 No cryptographic release signing is configured by these workflows. Staged and
 published packages are explicitly labeled unsigned until separate signing

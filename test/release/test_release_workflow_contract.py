@@ -21,10 +21,10 @@ class ReleaseWorkflowContractTest(unittest.TestCase):
         self.assertIn("candidate tag or branch already exists", self.preparation)
         self.assertIn("release already exists", self.preparation)
 
-    def test_publication_requires_verified_reviewer_protection_and_prerelease(self):
+    def test_publication_uses_native_reviewer_protection_and_prerelease(self):
         self.assertIn("environment: release-publication", self.publication)
-        self.assertIn("getEnvironment", self.publication)
-        self.assertIn("required_reviewers", self.publication)
+        self.assertNotIn("getEnvironment", self.publication)
+        self.assertNotIn("protection_rules", self.publication)
         self.assertNotIn("approval:", self.publication)
         self.assertIn("contents: write", self.publication)
         self.assertIn("manifest_sha256", self.publication)

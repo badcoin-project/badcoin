@@ -47,17 +47,6 @@ jobs:
             if (run.conclusion !== 'success' || run.path !== '.github/workflows/release-preparation.yml') {
               throw new Error('staging_run_id is not a successful release preparation run');
             }
-            let environment;
-            try {
-              ({ data: environment } = await github.rest.repos.getEnvironment({
-                owner: context.repo.owner, repo: context.repo.repo, environment_name: 'release-publication',
-              }));
-            } catch (error) {
-              throw new Error(`cannot verify release-publication environment protection: ${error.message}`);
-            }
-            if (!environment.protection_rules.some(rule => rule.type === 'required_reviewers')) {
-              throw new Error('release-publication environment lacks required-reviewers protection');
-            }
             for (const reference of [`tags/${tag}`, `heads/${tag}`]) {
               try {
                 await github.rest.git.getRef({ owner: context.repo.owner, repo: context.repo.repo, ref: reference });
