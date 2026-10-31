@@ -111,12 +111,15 @@ https://github.com/badcoin-project/badcoin/releases
 `Release preparation` is a manually dispatched, nonpublishing workflow. It
 requires an immutable candidate commit SHA, a new `vX.Y.Z.W-rcN` designation,
 and one successful artifact workflow run ID for Linux, Windows, and macOS.
-It rejects duplicate run IDs, a source run from another workflow or commit,
-unsuccessful source runs, incomplete artifacts, invalid checksums, missing
-provenance, and an existing tag, branch, or release.
+It rejects duplicate run IDs, source runs outside `development` or `main`,
+untrusted events, a source run from another workflow or commit, unsuccessful
+source runs, incomplete artifacts, invalid checksums, missing provenance, and
+an existing tag, branch, or release.
 
 The platform artifact workflows retain a candidate SHA provenance record with
-their artifacts. The preparation workflow checks that record, checksum files,
+their artifacts. This JSON is workflow metadata, not a cryptographic
+attestation. The preparation workflow checks it together with the trusted
+workflow-run identity, checksum files,
 the expected core/Qt executable inventories, and the existing smoke-test gates
 before producing a `badcoin-release-ready-staging` artifact. That artifact
 contains an unsigned deterministic `release-manifest.json` and
@@ -131,13 +134,15 @@ source workflow runs. A successful staging result remains review evidence only.
 
 `Release publication` is a separate manually dispatched workflow. Repository
 administrators must protect the `release-publication` GitHub environment with
-the required reviewer approval before it can run. It has `contents: write`
+GitHub required reviewers before it can run. The workflow queries that
+protection rule and fails closed when it cannot verify it. It has `contents: write`
 only in its protected publication job; ordinary CI and preparation retain
 read-only contents access. The maintainer must supply the exact successful
-preparation run ID, release tag, manifest SHA-256, and the literal approval
-value requested by the workflow. Publication rechecks tag/release collisions,
-the preparation run identity, manifest checksum, candidate commit, and unsigned
-status before it can create the release.
+preparation run ID, release tag, and manifest SHA-256. Environment reviewer
+approval is the authorization boundary; a typed workflow input is not treated
+as authorization. Publication rechecks tag/release collisions, the preparation
+run identity, manifest checksum, candidate commit, unsigned status, and the
+SHA-256 of every staged package file before it can create the prerelease.
 
 No cryptographic release signing is configured by these workflows. Staged and
 published packages are explicitly labeled unsigned until separate signing

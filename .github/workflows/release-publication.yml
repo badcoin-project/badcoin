@@ -15,18 +15,12 @@ name: Release publication
         description: SHA-256 of the reviewed release-manifest.json
         required: true
         type: string
-      approval:
-        description: Type publish_exact_reviewed_staging_package to authorize publication
-        required: true
-        type: string
-
 permissions:
   contents: read
 
 jobs:
   publish:
     name: Publish reviewed staging package
-    if: ${{ inputs.approval == 'publish_exact_reviewed_staging_package' }}
     runs-on: ubuntu-22.04
     environment: release-publication
     permissions:
@@ -35,11 +29,15 @@ jobs:
     steps:
       - name: Validate publication request and staging run
         uses: actions/github-script@v7
+        env:
+          STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
         with:
           script: |
-            const runId = '${{ inputs.staging_run_id }}';
-            const tag = '${{ inputs.release_tag }}';
-            const manifest = '${{ inputs.manifest_sha256 }}';
+            const runId = process.env.STAGING_RUN_ID;
+            const tag = process.env.RELEASE_TAG;
+            const manifest = process.env.MANIFEST_SHA256;
             if (!/^\d+$/.test(runId) || !/^v[0-9]+(?:\.[0-9]+){3}-rc[0-9]+$/.test(tag) || !/^[0-9a-f]{64}$/.test(manifest)) {
               throw new Error('invalid staging run, tag, or manifest checksum');
             }
@@ -48,6 +46,17 @@ jobs:
             });
             if (run.conclusion !== 'success' || run.path !== '.github/workflows/release-preparation.yml') {
               throw new Error('staging_run_id is not a successful release preparation run');
+            }
+            let environment;
+            try {
+              ({ data: environment } = await github.rest.repos.getEnvironment({
+                owner: context.repo.owner, repo: context.repo.repo, environment_name: 'release-publication',
+              }));
+            } catch (error) {
+              throw new Error(`cannot verify release-publication environment protection: ${error.message}`);
+            }
+            if (!environment.protection_rules.some(rule => rule.type === 'required_reviewers')) {
+              throw new Error('release-publication environment lacks required-reviewers protection');
             }
             for (const reference of [`tags/${tag}`, `heads/${tag}`]) {
               try {
@@ -72,17 +81,25 @@ jobs:
           run-id: ${{ inputs.staging_run_id }}
           github-token: ${{ github.token }}
 
-      - name: Confirm manifest identity and unsigned status
+      - name: Checkout independent manifest validator
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Independently validate staged artifacts and manifest
         run: |
-          test "$(sha256sum staging/release-manifest.json | awk '{print $1}')" = "${{ inputs.manifest_sha256 }}"
-          test "$(jq -r '.release_tag' staging/release-manifest.json)" = "${{ inputs.release_tag }}"
-          test "$(jq -r '.unsigned' staging/release-manifest.json)" = "true"
+          python3 contrib/release/verify_release_manifest.py \
+            --staging-dir staging \
+            --expected-tag "${{ inputs.release_tag }}" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}"
 
       - name: Publish exact reviewed package
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ inputs.release_tag }}" \
+            --prerelease \
             --target "$(jq -r '.candidate_commit' staging/release-manifest.json)" \
             --title "Badcoin Core ${{ inputs.release_tag }} (unsigned)" \
             --notes-file staging/VALIDATION-REPORT.txt \

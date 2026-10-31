@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / "contrib" / "release" / "prepare_release_package.py"
+VERIFY_SCRIPT = Path(__file__).resolve().parents[2] / "contrib" / "release" / "verify_release_manifest.py"
 CANDIDATE = "a" * 40
 TAG = "v1.0.0.0-rc99"
 PLATFORMS = {
@@ -56,6 +57,12 @@ class ReleasePackageTest(unittest.TestCase):
             "--candidate-sha", candidate, "--release-tag", tag,
         ], text=True, capture_output=True)
 
+    def run_verify(self, output_dir):
+        return subprocess.run([
+            "python3", str(VERIFY_SCRIPT), "--staging-dir", str(output_dir),
+            "--expected-tag", TAG,
+        ], text=True, capture_output=True)
+
     def test_prepares_complete_unsigned_package(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -67,6 +74,19 @@ class ReleasePackageTest(unittest.TestCase):
             self.assertEqual(manifest["release_tag"], TAG)
             self.assertTrue(manifest["unsigned"])
             self.assertEqual({entry["platform"] for entry in manifest["artifacts"]}, set(PLATFORMS))
+            verified = self.run_verify(root / "output")
+            self.assertEqual(verified.returncode, 0, verified.stderr)
+
+    def test_manifest_verifier_rejects_staged_artifact_tampering(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.create_input(root / "input")
+            prepared = self.run_prepare(root / "input", root / "output")
+            self.assertEqual(prepared.returncode, 0, prepared.stderr)
+            (root / "output/packages/linux-x64-core/badcoind").write_text("tampered", encoding="utf-8")
+            verified = self.run_verify(root / "output")
+            self.assertNotEqual(verified.returncode, 0)
+            self.assertIn("checksum mismatch", verified.stderr)
 
     def test_rejects_candidate_mismatch(self):
         with tempfile.TemporaryDirectory() as temporary:
