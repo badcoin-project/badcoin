@@ -38,6 +38,15 @@ class ReleaseWorkflowContractTest(unittest.TestCase):
             self.assertIn("contents: read", text)
             self.assertNotIn("contents: write", text)
 
+    def test_windows_qt_smoke_test_bounds_and_terminates_gui_help(self):
+        windows = (ROOT / ".github/workflows/windows-artifacts.yml").read_text(encoding="utf-8")
+        self.assertIn("$timeoutMilliseconds = 15000", windows)
+        self.assertIn("Start-Process", windows)
+        self.assertIn("WaitForExit($timeoutMilliseconds)", windows)
+        self.assertIn("taskkill.exe", windows)
+        self.assertIn("OriginalFilename -ne 'badcoin-qt.exe'", windows)
+        self.assertNotIn("(& .\\badcoin-qt.exe -help 2>&1 | Out-String)", windows)
+
 
 if __name__ == "__main__":
     unittest.main()

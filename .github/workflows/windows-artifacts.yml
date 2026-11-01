@@ -284,13 +284,35 @@ jobs:
           foreach ($file in @('badcoind.exe', 'badcoin-cli.exe', 'badcoin-tx.exe', 'badcoin-qt.exe')) {
             if (-not (Test-Path -LiteralPath $file)) { throw "Missing binary: $file" }
           }
+          $qtVersion = (Get-Item -LiteralPath .\badcoin-qt.exe).VersionInfo
+          if ($qtVersion.ProductVersion -notmatch '^1\.0\.0\.0' -or
+              $qtVersion.OriginalFilename -ne 'badcoin-qt.exe' -or
+              $qtVersion.FileDescription -notmatch 'Badcoin') {
+            throw "Unexpected badcoin-qt version metadata: $qtVersion"
+          }
 
-      - name: Smoke-test Windows Qt binary
+      - name: Smoke-test Windows Qt startup with bounded help dialog
         shell: pwsh
         working-directory: artifact
         run: |
           $ErrorActionPreference = 'Stop'
-          $help = (& .\badcoin-qt.exe -help 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0 -or $help -notmatch 'Badcoin') {
-            throw "badcoin-qt help identity check failed: $help"
+          $timeoutMilliseconds = 15000
+          $process = Start-Process -FilePath (Join-Path $PWD 'badcoin-qt.exe') -ArgumentList '-help' -PassThru -WindowStyle Hidden
+          try {
+            Start-Sleep -Seconds 3
+            if ($process.HasExited) {
+              throw "badcoin-qt exited before displaying its Windows help dialog (exit code $($process.ExitCode))"
+            }
+            if ($process.WaitForExit($timeoutMilliseconds)) {
+              throw "badcoin-qt help dialog closed unexpectedly during the startup smoke test (exit code $($process.ExitCode))"
+            }
+            Write-Host "badcoin-qt started and remained active for the bounded Windows help-dialog check"
+          }
+          finally {
+            if (-not $process.HasExited) {
+              & "$env:SystemRoot\System32\taskkill.exe" /PID $process.Id /T /F | Out-Null
+              if (-not $process.WaitForExit(10000)) {
+                throw "Timed-out badcoin-qt process did not terminate"
+              }
+            }
           }
