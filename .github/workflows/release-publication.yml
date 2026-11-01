@@ -1,0 +1,101 @@
+name: Release publication
+
+"on":
+  workflow_dispatch:
+    inputs:
+      staging_run_id:
+        description: Successful Release preparation workflow run ID
+        required: true
+        type: string
+      release_tag:
+        description: Exact staged release tag
+        required: true
+        type: string
+      manifest_sha256:
+        description: SHA-256 of the reviewed release-manifest.json
+        required: true
+        type: string
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish reviewed staging package
+    runs-on: ubuntu-22.04
+    environment: release-publication
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Validate publication request and staging run
+        uses: actions/github-script@v7
+        env:
+          STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+        with:
+          script: |
+            const runId = process.env.STAGING_RUN_ID;
+            const tag = process.env.RELEASE_TAG;
+            const manifest = process.env.MANIFEST_SHA256;
+            if (!/^\d+$/.test(runId) || !/^v[0-9]+(?:\.[0-9]+){3}-rc[0-9]+$/.test(tag) || !/^[0-9a-f]{64}$/.test(manifest)) {
+              throw new Error('invalid staging run, tag, or manifest checksum');
+            }
+            const { data: run } = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner, repo: context.repo.repo, run_id: Number(runId),
+            });
+            if (run.conclusion !== 'success' || run.path !== '.github/workflows/release-preparation.yml') {
+              throw new Error('staging_run_id is not a successful release preparation run');
+            }
+            for (const reference of [`tags/${tag}`, `heads/${tag}`]) {
+              try {
+                await github.rest.git.getRef({ owner: context.repo.owner, repo: context.repo.repo, ref: reference });
+                throw new Error(`tag or branch already exists: ${tag}`);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+            try {
+              await github.rest.repos.getReleaseByTag({ owner: context.repo.owner, repo: context.repo.repo, tag });
+              throw new Error(`release already exists for ${tag}`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+      - name: Download reviewed staging package
+        uses: actions/download-artifact@v4
+        with:
+          name: badcoin-release-ready-staging
+          path: staging
+          run-id: ${{ inputs.staging_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Checkout independent manifest validator
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Independently validate staged artifacts and manifest
+        run: |
+          python3 contrib/release/verify_release_manifest.py \
+            --staging-dir staging \
+            --expected-tag "${{ inputs.release_tag }}" \
+            --expected-manifest-sha "${{ inputs.manifest_sha256 }}"
+
+      - name: Publish exact reviewed package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.release_tag }}" \
+            --prerelease \
+            --target "$(jq -r '.candidate_commit' staging/release-manifest.json)" \
+            --title "Badcoin Core ${{ inputs.release_tag }} (unsigned)" \
+            --notes-file staging/VALIDATION-REPORT.txt \
+            staging/release-manifest.json \
+            staging/VALIDATION-REPORT.txt \
+            staging/packages/linux-x64-core/* \
+            staging/packages/windows-x64-core/* \
+            staging/packages/windows-x64-qt/* \
+            staging/packages/macos-arm64-core/* \
+            staging/packages/macos-arm64-qt/*

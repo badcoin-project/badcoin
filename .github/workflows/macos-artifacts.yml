@@ -134,6 +134,7 @@ jobs:
           cd ..
           tar -czf badcoin-macos-arm64-core.tar.gz -C macos-arm64-core .
           shasum -a 256 badcoin-macos-arm64-core.tar.gz > badcoin-macos-arm64-core.SHA256SUMS.txt
+          printf '{"commit":"%s","platform":"macos-arm64-core","workflow":"macos-artifacts.yml"}\n' "$GITHUB_SHA" > macos-arm64-core.provenance.json
 
       - name: Stage macOS Qt artifact
         run: |
@@ -148,6 +149,7 @@ jobs:
           cd ..
           tar -czf badcoin-macos-arm64-qt.tar.gz -C macos-arm64-qt .
           shasum -a 256 badcoin-macos-arm64-qt.tar.gz > badcoin-macos-arm64-qt.SHA256SUMS.txt
+          printf '{"commit":"%s","platform":"macos-arm64-qt","workflow":"macos-artifacts.yml"}\n' "$GITHUB_SHA" > macos-arm64-qt.provenance.json
 
       - name: Upload macOS core artifact
         uses: actions/upload-artifact@v7
@@ -156,6 +158,7 @@ jobs:
           path: |
             artifacts/badcoin-macos-arm64-core.tar.gz
             artifacts/badcoin-macos-arm64-core.SHA256SUMS.txt
+            artifacts/macos-arm64-core.provenance.json
           if-no-files-found: error
           retention-days: 14
 
@@ -166,6 +169,7 @@ jobs:
           path: |
             artifacts/badcoin-macos-arm64-qt.tar.gz
             artifacts/badcoin-macos-arm64-qt.SHA256SUMS.txt
+            artifacts/macos-arm64-qt.provenance.json
           if-no-files-found: error
           retention-days: 14
 
