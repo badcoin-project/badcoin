@@ -18,7 +18,7 @@ concurrency:
 jobs:
   macos-build:
     name: macOS arm64 core and Qt
-    runs-on: macos-14
+    runs-on: macos-15
 
     env:
       MAKEJOBS: "-j2"
@@ -176,7 +176,7 @@ jobs:
   macos-smoke:
     name: macOS arm64 smoke test
     needs: macos-build
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Download core artifact
