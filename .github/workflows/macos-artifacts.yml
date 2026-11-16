@@ -1,255 +1,166 @@
-name: macOS artifact build
+name: CORE-L3.001I macOS 15 Boost.Build diagnostics
 
 "on":
-  workflow_dispatch:
-  pull_request:
   push:
     branches:
-      - development
-      - main
+      - diagnostic/core-l3-001i-macos15-boost-20261114-01
 
 permissions:
   contents: read
 
 concurrency:
-  group: macos-artifacts-${{ github.ref }}
-  cancel-in-progress: true
+  group: core-l3-001i-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  macos-build:
-    name: macOS arm64 core and Qt
+  boost-build-diagnostic:
+    name: Boost 1.64 b2 crash diagnostics (macOS 15)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/diagnostic/core-l3-001i-macos15-boost-20261114-01'
     runs-on: macos-15
-
+    timeout-minutes: 60
     env:
-      MAKEJOBS: "-j2"
-
+      MAKEJOBS: '-j2'
     steps:
-      - name: Checkout
+      - name: Checkout exact pushed commit
         uses: actions/checkout@v5
         with:
           persist-credentials: false
+          fetch-depth: 2  # Include the exact parent for immutable baseline checks
 
-      - name: Set up Python 3.11
+      - name: Validate diagnostic identity and unchanged Boost recipe
+        shell: bash
+        run: |
+          printf 'GITHUB_EVENT_NAME=%s\nGITHUB_REF=%s\nGITHUB_SHA=%s\n' "$GITHUB_EVENT_NAME" "$GITHUB_REF" "$GITHUB_SHA"
+          test "$GITHUB_EVENT_NAME" = push
+          test "$GITHUB_REF" = refs/heads/diagnostic/core-l3-001i-macos15-boost-20261114-01
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git show bd33b7546f38ec497d2b12bd4da35b188542ae59:depends/packages/boost.mk | shasum -a 256
+          shasum -a 256 depends/packages/boost.mk
+          test "$(git hash-object depends/packages/boost.mk)" = "$(git rev-parse bd33b7546f38ec497d2b12bd4da35b188542ae59:depends/packages/boost.mk)"
+          test "$(git diff --name-only bd33b7546f38ec497d2b12bd4da35b188542ae59 HEAD)" = '.github/workflows/macos-artifacts.yml'
+
+      - name: Set up Python 3.11 (same as failed workflow)
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           architecture: arm64
 
-      - name: Install build dependencies
+      - name: Install original build prerequisites
+        shell: bash
         run: |
           brew install automake libtool pkg-config cmake
           python -m pip install setuptools
           python --version
-          python -c "import setuptools; print(setuptools.__version__)"
-          python3 -W ignore::DeprecationWarning -c "import asyncore"
+          python -c 'import setuptools; print(setuptools.__version__)'
+          python3 -W ignore::DeprecationWarning -c 'import asyncore'
 
-      - name: Build depends
+      - name: Capture host, compiler, linker, SDK and debugger
+        shell: bash
         run: |
-          make -C depends ${MAKEJOBS}
+          printf '%s\n' '=== CORE-L3.001I HOST ==='
+          sw_vers
+          uname -a
+          uname -m
+          sysctl -n hw.optional.arm64 2>/dev/null || true
+          xcode-select -p
+          xcodebuild -version
+          xcrun --find clang
+          xcrun clang --version
+          xcrun --find clang++
+          xcrun clang++ --version
+          xcrun --find ld
+          xcrun ld -version_details
+          xcrun --show-sdk-path
+          xcrun --show-sdk-version
+          xcrun --show-sdk-build-version
+          lldb --version
+          ./depends/config.guess
+          test "$(uname -m)" = arm64
+          printf '%s\n' '=== END HOST ==='
 
-      - name: Show Boost bootstrap diagnostics
-        if: failure()
+      - name: Run unchanged depends recipe and retain bounded diagnostic transcript
+        shell: bash
         run: |
-          find depends/work -name bootstrap.log -print
-          for log in $(find depends/work -name bootstrap.log); do
-            echo "--- ${log} ---"
-            tail -n 120 "${log}"
-          done
+          printf '%s\n' '=== CORE-L3.001I ORIGINAL DEPENDS REPRODUCTION ==='
+          echo 'COMMAND: make -C depends -j2 V=1'
+          rc=0
+          make -C depends -j2 V=1 > "$RUNNER_TEMP/core-l3-001i-make.log" 2>&1 || rc=$?
+          printf 'DEPENDS_EXIT=%s\n' "$rc"
+          printf 'DEPENDS_EXIT=%s\n' "$rc" >> "$GITHUB_ENV"
+          printf '%s\n' '=== BOOST COMMANDS / FAILURE MARKERS ==='
+          grep -En 'Building boost|Configuring boost|Staging boost|bootstrap\.sh|/b2 |Segmentation fault|SIGSEGV|Error 139|Error 11' "$RUNNER_TEMP/core-l3-001i-make.log" | tail -n 70 || true
+          printf '%s\n' '=== BOOTSTRAP ENGINE COMPILE / LINK COMMANDS (LAST 100) ==='
+          grep -En 'build\.sh|build\.jam|BOOST_JAM_CC|(^|[[:space:]])(clang|clang\+\+|gcc|g\+\+|cc|c\+\+|ld)([[:space:]]|$)|-o[[:space:]]+(b2|bjam)|bootstrap\.sh' "$RUNNER_TEMP/core-l3-001i-make.log" | tail -n 100 || true
+          printf '%s\n' '=== LAST 140 DEPENDS LINES ==='
+          tail -n 140 "$RUNNER_TEMP/core-l3-001i-make.log"
+          printf '%s\n' '=== BOOTSTRAP LOGS ==='
+          find depends/work -name bootstrap.log -type f -print -exec tail -n 90 {} \; 2>/dev/null || true
+          printf '%s\n' '=== END ORIGINAL DEPENDS REPRODUCTION ==='
 
-      - name: Configure
+      - name: Inspect b2 Mach-O and replay failing command under LLDB
+        shell: bash
         run: |
-          # The unit-test target hardcodes x86 SSE2 flags; use its generic scrypt path on arm64.
-          sed -i '' 's/ -DUSE_SSE2 -msse2//g' src/Makefile.test.include
-          if grep -En -- '-DUSE_SSE2|-msse2' src/Makefile.test.include; then
-            echo "x86 SSE2 test flags remain on the arm64 build"
-            exit 1
-          fi
-          ./autogen.sh
-          HOST="$(./depends/config.guess)"
-          if ! CXXFLAGS="-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION" \
-              CONFIG_SITE="$PWD/depends/${HOST}/share/config.site" ./configure \
-              --prefix=/ \
-              --disable-ccache \
-              --disable-maintainer-mode \
-              --disable-dependency-tracking \
-              --disable-bench \
-              --with-gui=qt5; then
-            grep -n -B 10 -A 200 -- 'Boost::Thread library is available' config.log || true
-            grep -n -B 40 -A 100 -- '-lqminimal' config.log || tail -n 500 config.log
-            exit 1
-          fi
+          printf '%s\n' '=== CORE-L3.001I LLDB DIAGNOSTICS ==='
+          python3 - <<'PY'
+          import os
+          import pathlib
+          import re
+          import shlex
+          import subprocess
 
-      - name: Verify secp256k1 test toolchain
-        run: |
-          grep -E '^(CPPFLAGS|LDFLAGS|SECP_TEST_INCLUDES|SECP_TEST_LIBS) =' src/secp256k1/Makefile
-          make -C src/secp256k1 V=1 tests
+          log = pathlib.Path(os.environ['RUNNER_TEMP']) / 'core-l3-001i-make.log'
+          lines = log.read_text(errors='replace').splitlines() if log.exists() else []
+          candidates = [p for p in pathlib.Path('depends/work/build').rglob('b2') if p.is_file() and os.access(p, os.X_OK)]
+          print('B2_CANDIDATES=', [str(p) for p in candidates])
+          if not candidates:
+              print('LLDB_RESULT=NO_B2_BINARY; cannot identify crash under debugger')
+              raise SystemExit(0)
 
-      - name: Build
-        run: |
-          make ${MAKEJOBS}
+          b2 = next((p for p in candidates if '/boost/' in p.as_posix()), candidates[0]).resolve()
+          print('B2_PATH=', b2)
+          for command in (['file', str(b2)], ['otool', '-hv', str(b2)], ['otool', '-L', str(b2)]):
+              result = subprocess.run(command, capture_output=True, text=True, errors='replace')
+              print('COMMAND=', shlex.join(command), 'EXIT=', result.returncode)
+              print((result.stdout + result.stderr)[-6000:])
 
-      - name: Run unit tests
-        id: unit_tests
-        env:
-          QTEST_FUNCTION_TIMEOUT: '900000'
-        run: |
-          make check
+          # The depends recipe prints its actual shell command when V=1.
+          # Preserve its exact b2 arguments; never infer a different Boost version.
+          invocations = []
+          for line in lines:
+              if './b2 ' not in line:
+                  continue
+              suffix = line.split('./b2 ', 1)[1]
+              try:
+                  words = shlex.split(suffix)
+              except ValueError:
+                  continue
+              for terminator in ('stage', 'install'):
+                  if terminator in words:
+                      invocations.append((terminator, words[:words.index(terminator)+1], line))
+                      break
+          print('B2_INVOCATION_COUNT=', len(invocations))
+          if not invocations:
+              print('LLDB_RESULT=NO_EXACT_B2_INVOCATION_IN_LOG; refusing guessed reproduction')
+              raise SystemExit(0)
 
-      - name: Show macOS unit-test failure logs
-        if: ${{ failure() && steps.unit_tests.conclusion == 'failure' }}
-        run: |
-          for log in src/test-suite.log src/test/test_badcoin.log src/qt/test/test_badcoin-qt.log; do
-            if [ -f "$log" ]; then
-              echo "::group::${log}"
-              tail -n 250 "$log"
-              echo "::endgroup::"
-            fi
-          done
-
-      - name: Upload macOS unit-test failure logs
-        if: ${{ failure() && steps.unit_tests.conclusion == 'failure' }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: badcoin-macos-arm64-unit-test-logs
-          path: |
-            src/test-suite.log
-            src/test/*.log
-            src/qt/test/*.log
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Run focused functional tests
-        run: |
-          test/functional/test_runner.py feature_datacarrier.py p2p_message_size.py
-
-      - name: Stage macOS core artifact
-        run: |
-          mkdir -p artifacts/macos-arm64-core
-          cp -v src/badcoind artifacts/macos-arm64-core/
-          cp -v src/badcoin-cli artifacts/macos-arm64-core/
-          cp -v src/badcoin-tx artifacts/macos-arm64-core/
-          cd artifacts/macos-arm64-core
-          shasum -a 256 badcoind badcoin-cli badcoin-tx > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-          cd ..
-          tar -czf badcoin-macos-arm64-core.tar.gz -C macos-arm64-core .
-          shasum -a 256 badcoin-macos-arm64-core.tar.gz > badcoin-macos-arm64-core.SHA256SUMS.txt
-          printf '{"commit":"%s","platform":"macos-arm64-core","workflow":"macos-artifacts.yml"}\n' "$GITHUB_SHA" > macos-arm64-core.provenance.json
-
-      - name: Stage macOS Qt artifact
-        run: |
-          mkdir -p artifacts/macos-arm64-qt
-          cp -v src/badcoind artifacts/macos-arm64-qt/
-          cp -v src/badcoin-cli artifacts/macos-arm64-qt/
-          cp -v src/badcoin-tx artifacts/macos-arm64-qt/
-          cp -v src/qt/badcoin-qt artifacts/macos-arm64-qt/
-          cd artifacts/macos-arm64-qt
-          shasum -a 256 badcoind badcoin-cli badcoin-tx badcoin-qt > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-          cd ..
-          tar -czf badcoin-macos-arm64-qt.tar.gz -C macos-arm64-qt .
-          shasum -a 256 badcoin-macos-arm64-qt.tar.gz > badcoin-macos-arm64-qt.SHA256SUMS.txt
-          printf '{"commit":"%s","platform":"macos-arm64-qt","workflow":"macos-artifacts.yml"}\n' "$GITHUB_SHA" > macos-arm64-qt.provenance.json
-
-      - name: Upload macOS core artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: badcoin-macos-arm64-core
-          path: |
-            artifacts/badcoin-macos-arm64-core.tar.gz
-            artifacts/badcoin-macos-arm64-core.SHA256SUMS.txt
-            artifacts/macos-arm64-core.provenance.json
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload macOS Qt artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: badcoin-macos-arm64-qt
-          path: |
-            artifacts/badcoin-macos-arm64-qt.tar.gz
-            artifacts/badcoin-macos-arm64-qt.SHA256SUMS.txt
-            artifacts/macos-arm64-qt.provenance.json
-          if-no-files-found: error
-          retention-days: 14
-
-  macos-smoke:
-    name: macOS arm64 smoke test
-    needs: macos-build
-    runs-on: macos-15
-
-    steps:
-      - name: Download core artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: badcoin-macos-arm64-core
-          path: core-archive
-
-      - name: Download Qt artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: badcoin-macos-arm64-qt
-          path: qt-archive
-
-      - name: Verify checksums and executables
-        run: |
-          (cd core-archive && shasum -a 256 -c badcoin-macos-arm64-core.SHA256SUMS.txt)
-          (cd qt-archive && shasum -a 256 -c badcoin-macos-arm64-qt.SHA256SUMS.txt)
-          mkdir -p core qt
-          tar -xzf core-archive/badcoin-macos-arm64-core.tar.gz -C core
-          tar -xzf qt-archive/badcoin-macos-arm64-qt.tar.gz -C qt
-          (cd core && shasum -a 256 -c SHA256SUMS.txt)
-          (cd qt && shasum -a 256 -c SHA256SUMS.txt)
-          test -x core/badcoind
-          test -x core/badcoin-cli
-          test -x core/badcoin-tx
-          test -x qt/badcoin-qt
-
-      - name: Smoke-test versions and Qt launch
-        run: |
-          core/badcoind --version
-          core/badcoin-cli --version
-          core/badcoin-tx --help
-          if ! QT_QPA_PLATFORM=cocoa qt/badcoin-qt -help >"$RUNNER_TEMP/badcoin-qt-help.txt" 2>&1; then
-            cat "$RUNNER_TEMP/badcoin-qt-help.txt"
-            exit 1
-          fi
-          cat "$RUNNER_TEMP/badcoin-qt-help.txt"
-          grep -E "Badcoin|badcoin-qt" "$RUNNER_TEMP/badcoin-qt-help.txt"
-
-      - name: Smoke-test daemon and RPC
-        run: |
-          TESTDIR="$RUNNER_TEMP/badcoin-macos-core-smoke"
-          mkdir -p "$TESTDIR"
-          core/badcoind \
-            -datadir="$TESTDIR" \
-            -server=1 \
-            -listen=0 \
-            -dnsseed=0 \
-            -connect=0 \
-            -rpcuser=badcoin-ci \
-            -rpcpassword=badcoin-ci-test \
-            >"$TESTDIR/badcoind.log" 2>&1 &
-          DAEMON_PID=$!
-          sleep 5
-          core/badcoin-cli \
-            -datadir="$TESTDIR" \
-            -rpcuser=badcoin-ci \
-            -rpcpassword=badcoin-ci-test \
-            getblockchaininfo
-          core/badcoin-cli \
-            -datadir="$TESTDIR" \
-            -rpcuser=badcoin-ci \
-            -rpcpassword=badcoin-ci-test \
-            stop
-          sleep 3
-          kill -0 "$DAEMON_PID" 2>/dev/null && kill "$DAEMON_PID" || true
-
-      - name: Upload macOS smoke logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: badcoin-macos-smoke-logs
-          path: ${{ runner.temp }}/badcoin-macos-core-smoke
-          if-no-files-found: warn
-          retention-days: 14
+          kind, args, source_line = invocations[-1]
+          print('B2_PHASE=', kind)
+          print('B2_RECIPE_LINE=', source_line[-4000:])
+          print('LLDB_TARGET_ARGS=', shlex.join([str(b2)] + args))
+          native = pathlib.Path('depends') / subprocess.run(['./depends/config.guess'], capture_output=True, text=True).stdout.strip() / 'native' / 'bin'
+          env = os.environ.copy()
+          env['PATH'] = str(native.resolve()) + os.pathsep + env['PATH']
+          command = ['lldb', '--batch', '-o', 'run', '-o', 'process status', '-o', 'thread backtrace all', '-o', 'image list', '--', str(b2), *args]
+          print('LLDB_COMMAND=', shlex.join(command))
+          try:
+              result = subprocess.run(command, cwd=str(b2.parent), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace', timeout=240)
+              print('LLDB_EXIT=', result.returncode)
+              print('=== LLDB OUTPUT (LAST 350 LINES) ===')
+              print('\n'.join(result.stdout.splitlines()[-350:]))
+              print('=== END LLDB OUTPUT ===')
+          except subprocess.TimeoutExpired as exc:
+              print('LLDB_RESULT=TIMEOUT_240_SECONDS')
+              if exc.stdout:
+                  print(exc.stdout[-16000:])
+          PY
+          printf '%s\n' '=== END CORE-L3.001I LLDB DIAGNOSTICS ==='
